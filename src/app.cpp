@@ -67,7 +67,11 @@ void Application::ProcessInput() {
 
 // Event handler for mouse movement
 void Application::OnMouseMove(double xpos, double ypos) {
-    // Only process mouse movement if camera is enabled
+    // Always store mouse position for hover detection (even if ImGui wants input)
+    mouse_x_ = xpos;
+    mouse_y_ = ypos;
+
+    // Only process camera look if camera is enabled
     if (!camera_enabled_) {
         return;
     }
@@ -106,8 +110,21 @@ void Application::OnMouseMove(double xpos, double ypos) {
 
 // Event handler for mouse button clicks
 void Application::OnMouseButton(int button, int action, int mods, double xpos, double ypos) {
+    const int BUTTON_LEFT = 0;  // Left mouse button
     const int BUTTON_RIGHT = 1; // Right mouse button
     const int ACTION_PRESS = 1;
+
+    // Left-click to select entity (only when camera is disabled)
+    if (button == BUTTON_LEFT && action == ACTION_PRESS && !camera_enabled_) {
+        // Select the currently hovered entity
+        if (hovered_entity_id_ >= 0) {
+            selected_entity_id_ = hovered_entity_id_;
+            grassland::LogInfo("Selected Entity #{}", selected_entity_id_);
+        } else {
+            selected_entity_id_ = -1;
+            grassland::LogInfo("Deselected entity");
+        }
+    }
 
     if (button == BUTTON_RIGHT && action == ACTION_PRESS) {
         // Toggle camera mode
@@ -155,7 +172,10 @@ void Application::OnInit() {
 
     // Initialize camera as DISABLED to avoid cursor conflicts with multiple windows
     camera_enabled_ = false;
+    hovered_entity_id_ = -1; // No entity hovered initially
     selected_entity_id_ = -1; // No entity selected initially
+    mouse_x_ = 0.0;
+    mouse_y_ = 0.0;
     // Don't grab cursor initially - user can right-click to enable camera mode
 
     // Create scene
@@ -207,6 +227,12 @@ void Application::OnInit() {
     scene_->BuildAccelerationStructures();
 
     core_->CreateBuffer(sizeof(CameraObject), grassland::graphics::BUFFER_TYPE_DYNAMIC, &camera_object_buffer_);
+    
+    // Create hover info buffer
+    core_->CreateBuffer(sizeof(HoverInfo), grassland::graphics::BUFFER_TYPE_DYNAMIC, &hover_info_buffer_);
+    HoverInfo initial_hover{};
+    initial_hover.hovered_entity_id = -1;
+    hover_info_buffer_->UploadData(&initial_hover, sizeof(HoverInfo));
 
     // Initialize camera state member variables
     camera_pos_ = glm::vec3{ 0.0f, 1.0f, 5.0f };
@@ -249,6 +275,7 @@ void Application::OnInit() {
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);          // space1
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);          // space2
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);          // space3 - materials
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);          // space4 - hover info
     program_->Finalize();
 }
 
@@ -263,10 +290,97 @@ void Application::OnClose() {
 
     color_image_.reset();
     camera_object_buffer_.reset();
+    hover_info_buffer_.reset();
     
     // Don't call TerminateImGui - let the window destructor handle it
     // Just reset window which will clean everything up properly
     window_.reset();
+}
+
+void Application::UpdateHoveredEntity() {
+    // Only detect hover when camera is disabled (cursor visible)
+    if (camera_enabled_) {
+        hovered_entity_id_ = -1;
+        return;
+    }
+
+    // Cast ray from mouse position
+    float x = (float)mouse_x_;
+    float y = (float)mouse_y_;
+    float width = (float)window_->GetWidth();
+    float height = (float)window_->GetHeight();
+    
+    // Mouse position is tracked continuously, no logging needed
+
+    // Match the shader's ray generation exactly (shader.hlsl lines 32-38)
+    // Note: mouse_x_ and mouse_y_ are already pixel coordinates [0, width) x [0, height)
+    // In shader: pixel_center = DispatchRaysIndex() + (0.5, 0.5)
+    // But mouse coords are already continuous, so we don't add 0.5
+    
+    // 1. uv = mouse / dimensions -> [0, 1]
+    glm::vec2 uv = glm::vec2(x / width, y / height);
+    
+    // 2. Flip Y (shader does: uv.y = 1.0 - uv.y)
+    uv.y = 1.0f - uv.y;
+    
+    // 3. Convert to NDC: d = uv * 2.0 - 1.0 -> [-1, 1]
+    glm::vec2 d = uv * 2.0f - 1.0f;
+
+    // Get the camera matrices - must match shader exactly
+    glm::mat4 projection = glm::perspective(glm::radians(60.0f), width / height, 0.1f, 10.0f);
+    glm::mat4 view = glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_);
+    
+    glm::mat4 screen_to_camera = glm::inverse(projection);
+    glm::mat4 camera_to_world = glm::inverse(view);
+
+    // 4. target = screen_to_camera * (d, 1, 1)
+    glm::vec4 target = screen_to_camera * glm::vec4(d.x, d.y, 1.0f, 1.0f);
+    
+    // 5. direction = camera_to_world * (target.xyz, 0)
+    glm::vec4 direction = camera_to_world * glm::vec4(glm::vec3(target), 0.0f);
+
+    // Ray origin and direction
+    glm::vec3 ray_origin = camera_pos_;
+    glm::vec3 ray_world = glm::normalize(glm::vec3(direction));
+
+    // Simple ray-sphere intersection for each entity
+    hovered_entity_id_ = -1;
+    float closest_t = FLT_MAX;
+
+    const auto& entities = scene_->GetEntities();
+    for (size_t i = 0; i < entities.size(); i++) {
+        const auto& entity = entities[i];
+        
+        // Extract position from entity transform (assumes translation in last column)
+        glm::mat4 transform = entity->GetTransform();
+        glm::vec3 center = glm::vec3(transform[3]);
+        
+        // Approximate radius based on transform scale
+        // Use a generous radius multiplier to make selection easier
+        glm::vec3 scale = glm::vec3(
+            glm::length(glm::vec3(transform[0])),
+            glm::length(glm::vec3(transform[1])),
+            glm::length(glm::vec3(transform[2]))
+        );
+        float radius = glm::max(glm::max(scale.x, scale.y), scale.z) * 1.5f;
+
+        // Ray-sphere intersection
+        glm::vec3 oc = ray_origin - center;
+        float a = glm::dot(ray_world, ray_world);
+        float b = 2.0f * glm::dot(oc, ray_world);
+        float c = glm::dot(oc, oc) - radius * radius;
+        float discriminant = b * b - 4 * a * c;
+
+        if (discriminant >= 0) {
+            float t = (-b - sqrt(discriminant)) / (2.0f * a);
+            if (t > 0 && t < closest_t) {
+                closest_t = t;
+                hovered_entity_id_ = static_cast<int>(i);
+            }
+        }
+    }
+    
+    // Hover state is shown in the UI panels, no logging needed
 }
 
 void Application::OnUpdate() {
@@ -276,9 +390,16 @@ void Application::OnUpdate() {
         return;  // Exit update immediately after closing
     }
     if (alive_) {
-        // +++ ADDED SECTION +++
         // Process keyboard input to move camera
         ProcessInput();
+        
+        // Update which entity is being hovered
+        UpdateHoveredEntity();
+        
+        // Update hover info buffer
+        HoverInfo hover_info{};
+        hover_info.hovered_entity_id = hovered_entity_id_;
+        hover_info_buffer_->UploadData(&hover_info, sizeof(HoverInfo));
 
         // Update the camera buffer with new position/orientation
         CameraObject camera_object{};
@@ -329,6 +450,20 @@ void Application::RenderInfoOverlay() {
     size_t entity_count = scene_->GetEntityCount();
     ImGui::Text("Entities: %zu", entity_count);
     ImGui::Text("Materials: %zu", entity_count); // One material per entity
+    
+    // Show hovered entity
+    if (hovered_entity_id_ >= 0) {
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Hovered: Entity #%d", hovered_entity_id_);
+    } else {
+        ImGui::Text("Hovered: None");
+    }
+    
+    // Show selected entity
+    if (selected_entity_id_ >= 0) {
+        ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Selected: Entity #%d", selected_entity_id_);
+    } else {
+        ImGui::Text("Selected: None");
+    }
     
     // Calculate total triangles
     size_t total_triangles = 0;
@@ -469,7 +604,7 @@ void Application::RenderEntityPanel() {
         }
         
         if (entity->GetVertexBuffer()) {
-            size_t vertex_size = sizeof(float) * 8; // Assuming pos(3) + normal(3) + uv(2)
+            size_t vertex_size = sizeof(float) * 3; // Assuming pos(3)
             size_t vertex_count = entity->GetVertexBuffer()->Size() / vertex_size;
             ImGui::Text("Vertices: %zu", vertex_count);
         }
@@ -486,7 +621,7 @@ void Application::RenderEntityPanel() {
     } else {
         ImGui::TextDisabled("No entity selected");
         ImGui::Spacing();
-        ImGui::TextWrapped("Select an entity from the dropdown above to inspect.");
+        ImGui::TextWrapped("Hover over an entity to highlight it, then left-click to select. Or use the dropdown above.");
     }
     
     ImGui::End();
@@ -506,6 +641,7 @@ void Application::OnRender() {
     command_context->CmdBindResources(1, { color_image_.get() }, grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(2, { camera_object_buffer_.get() }, grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(3, { scene_->GetMaterialsBuffer() }, grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(4, { hover_info_buffer_.get() }, grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
     
     // Render ImGui overlay

@@ -18,6 +18,7 @@ public:
     void OnClose();
     void OnUpdate();
     void OnRender();
+    void UpdateHoveredEntity(); // Update which entity the mouse is hovering over
     void RenderEntityPanel(); // Render entity inspector panel on the right
 
     bool IsAlive() const {
@@ -34,6 +35,13 @@ private:
 
     // Camera
     std::unique_ptr<grassland::graphics::Buffer> camera_object_buffer_;
+    
+    // Hover info buffer
+    struct HoverInfo {
+        int hovered_entity_id;
+        float padding[3];
+    };
+    std::unique_ptr<grassland::graphics::Buffer> hover_info_buffer_;
 
     // Shaders
     std::unique_ptr<grassland::graphics::Shader> raygen_shader_;
@@ -45,7 +53,6 @@ private:
     std::unique_ptr<grassland::graphics::RayTracingProgram> program_;
     bool alive_{ false };
 
-    // +++ MODIFIED FOR CAMERA CONTROLS +++
     void ProcessInput(); // Helper function for keyboard input
 
 
@@ -66,6 +73,11 @@ private:
     float mouse_sensitivity_;
     bool first_mouse_; // Prevents camera jump on first mouse input
     bool camera_enabled_; // Whether camera movement is enabled
+    
+    // Mouse hovering
+    double mouse_x_;
+    double mouse_y_;
+    int hovered_entity_id_; // -1 if no entity hovered
     
     // Entity selection
     int selected_entity_id_; // -1 if no entity selected

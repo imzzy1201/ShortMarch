@@ -11,10 +11,16 @@ struct Material {
   float padding[3];
 };
 
+struct HoverInfo {
+  int hovered_entity_id;
+  float padding[3];
+};
+
 RaytracingAccelerationStructure as : register(t0, space0);
 RWTexture2D<float4> output : register(u0, space1);
 ConstantBuffer<CameraInfo> camera_info : register(b0, space2);
 StructuredBuffer<Material> materials : register(t0, space3);
+ConstantBuffer<HoverInfo> hover_info : register(b0, space4);
 
 struct RayPayload {
   float3 color;
@@ -74,6 +80,12 @@ struct RayPayload {
   
   // Apply material color
   float3 diffuse = mat.base_color * (0.3 + 0.7 * ndotl);
+  
+  // Highlight if this is the hovered entity
+  if ((int)material_idx == hover_info.hovered_entity_id) {
+    // Add bright white highlight
+    diffuse = lerp(diffuse, float3(1.0, 1.0, 1.0), 0.4);
+  }
   
   payload.color = diffuse;
 }
