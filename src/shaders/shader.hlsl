@@ -21,6 +21,7 @@ RWTexture2D<float4> output : register(u0, space1);
 ConstantBuffer<CameraInfo> camera_info : register(b0, space2);
 StructuredBuffer<Material> materials : register(t0, space3);
 ConstantBuffer<HoverInfo> hover_info : register(b0, space4);
+RWTexture2D<int> entity_id_output : register(u0, space5);
 
 struct RayPayload {
   float3 color;
@@ -54,6 +55,10 @@ struct RayPayload {
   TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
 
   output[DispatchRaysIndex().xy] = float4(payload.color, 1);
+  
+  // Write entity ID to the ID buffer
+  // If no hit, write -1; otherwise write the instance ID
+  entity_id_output[DispatchRaysIndex().xy] = payload.hit ? (int)payload.instance_id : -1;
 }
 
 [shader("miss")] void MissMain(inout RayPayload payload) {
@@ -61,6 +66,7 @@ struct RayPayload {
   float t = 0.5 * (normalize(WorldRayDirection()).y + 1.0);
   payload.color = lerp(float3(1.0, 1.0, 1.0), float3(0.5, 0.7, 1.0), t);
   payload.hit = false;
+  payload.instance_id = 0xFFFFFFFF; // Invalid ID for miss
 }
 
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {

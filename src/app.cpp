@@ -264,6 +264,10 @@ void Application::OnInit() {
 
     core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
         &color_image_);
+    
+    // Create entity ID buffer for accurate picking (R32_SINT to store entity indices)
+    core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32_SINT,
+        &entity_id_image_);
 
     core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "RayGenMain", "lib_6_3", &raygen_shader_);
     core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "MissMain", "lib_6_3", &miss_shader_);
@@ -272,10 +276,11 @@ void Application::OnInit() {
 
     core_->CreateRayTracingProgram(raygen_shader_.get(), miss_shader_.get(), closest_hit_shader_.get(), &program_);
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);  // space0
-    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);          // space1
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);          // space1 - color output
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);          // space2
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);          // space3 - materials
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);          // space4 - hover info
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);          // space5 - entity ID output
     program_->Finalize();
 }
 
@@ -289,6 +294,7 @@ void Application::OnClose() {
     scene_.reset();
 
     color_image_.reset();
+    entity_id_image_.reset();
     camera_object_buffer_.reset();
     hover_info_buffer_.reset();
     
@@ -304,81 +310,30 @@ void Application::UpdateHoveredEntity() {
         return;
     }
 
-    // Cast ray from mouse position
-    float x = (float)mouse_x_;
-    float y = (float)mouse_y_;
-    float width = (float)window_->GetWidth();
-    float height = (float)window_->GetHeight();
+    // Get mouse position in pixel coordinates
+    int x = static_cast<int>(mouse_x_);
+    int y = static_cast<int>(mouse_y_);
+    int width = window_->GetWidth();
+    int height = window_->GetHeight();
     
-    // Mouse position is tracked continuously, no logging needed
-
-    // Match the shader's ray generation exactly (shader.hlsl lines 32-38)
-    // Note: mouse_x_ and mouse_y_ are already pixel coordinates [0, width) x [0, height)
-    // In shader: pixel_center = DispatchRaysIndex() + (0.5, 0.5)
-    // But mouse coords are already continuous, so we don't add 0.5
-    
-    // 1. uv = mouse / dimensions -> [0, 1]
-    glm::vec2 uv = glm::vec2(x / width, y / height);
-    
-    // 2. Flip Y (shader does: uv.y = 1.0 - uv.y)
-    uv.y = 1.0f - uv.y;
-    
-    // 3. Convert to NDC: d = uv * 2.0 - 1.0 -> [-1, 1]
-    glm::vec2 d = uv * 2.0f - 1.0f;
-
-    // Get the camera matrices - must match shader exactly
-    glm::mat4 projection = glm::perspective(glm::radians(60.0f), width / height, 0.1f, 10.0f);
-    glm::mat4 view = glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_);
-    
-    glm::mat4 screen_to_camera = glm::inverse(projection);
-    glm::mat4 camera_to_world = glm::inverse(view);
-
-    // 4. target = screen_to_camera * (d, 1, 1)
-    glm::vec4 target = screen_to_camera * glm::vec4(d.x, d.y, 1.0f, 1.0f);
-    
-    // 5. direction = camera_to_world * (target.xyz, 0)
-    glm::vec4 direction = camera_to_world * glm::vec4(glm::vec3(target), 0.0f);
-
-    // Ray origin and direction
-    glm::vec3 ray_origin = camera_pos_;
-    glm::vec3 ray_world = glm::normalize(glm::vec3(direction));
-
-    // Simple ray-sphere intersection for each entity
-    hovered_entity_id_ = -1;
-    float closest_t = FLT_MAX;
-
-    const auto& entities = scene_->GetEntities();
-    for (size_t i = 0; i < entities.size(); i++) {
-        const auto& entity = entities[i];
-        
-        // Extract position from entity transform (assumes translation in last column)
-        glm::mat4 transform = entity->GetTransform();
-        glm::vec3 center = glm::vec3(transform[3]);
-        
-        // Approximate radius based on transform scale
-        // Use a generous radius multiplier to make selection easier
-        glm::vec3 scale = glm::vec3(
-            glm::length(glm::vec3(transform[0])),
-            glm::length(glm::vec3(transform[1])),
-            glm::length(glm::vec3(transform[2]))
-        );
-        float radius = glm::max(glm::max(scale.x, scale.y), scale.z) * 1.5f;
-
-        // Ray-sphere intersection
-        glm::vec3 oc = ray_origin - center;
-        float a = glm::dot(ray_world, ray_world);
-        float b = 2.0f * glm::dot(oc, ray_world);
-        float c = glm::dot(oc, oc) - radius * radius;
-        float discriminant = b * b - 4 * a * c;
-
-        if (discriminant >= 0) {
-            float t = (-b - sqrt(discriminant)) / (2.0f * a);
-            if (t > 0 && t < closest_t) {
-                closest_t = t;
-                hovered_entity_id_ = static_cast<int>(i);
-            }
-        }
+    // Check bounds
+    if (x < 0 || x >= width || y < 0 || y >= height) {
+        hovered_entity_id_ = -1;
+        return;
     }
+
+    // Read entity ID from the ID buffer at the mouse position
+    // The entity_id_image_ stores the entity index (-1 for no entity)
+    int32_t entity_id = -1;
+    
+    // Download the single pixel value from the entity ID buffer
+    // Note: This is a synchronous read which may cause a GPU stall
+    // For better performance, consider using a readback buffer with a frame delay
+    grassland::graphics::Offset2D offset{ x, y };
+    grassland::graphics::Extent2D extent{ 1, 1 };
+    entity_id_image_->DownloadData(&entity_id, offset, extent);
+    
+    hovered_entity_id_ = entity_id;
     
     // Hover state is shown in the UI panels, no logging needed
 }
@@ -636,12 +591,17 @@ void Application::OnRender() {
     std::unique_ptr<grassland::graphics::CommandContext> command_context;
     core_->CreateCommandContext(&command_context);
     command_context->CmdClearImage(color_image_.get(), { {0.6, 0.7, 0.8, 1.0} });
+    
+    // Clear entity ID buffer with -1 (no entity)
+    command_context->CmdClearImage(entity_id_image_.get(), { {-1, 0, 0, 0} });
+    
     command_context->CmdBindRayTracingProgram(program_.get());
     command_context->CmdBindResources(0, scene_->GetTLAS(), grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(1, { color_image_.get() }, grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(2, { camera_object_buffer_.get() }, grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(3, { scene_->GetMaterialsBuffer() }, grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(4, { hover_info_buffer_.get() }, grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(5, { entity_id_image_.get() }, grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
     
     // Render ImGui overlay
