@@ -4,10 +4,10 @@
 
 // Simple material structure for ray tracing
 struct Material {
-    glm::vec3 base_color;            // DEPRECATED
-    float roughness;                 // DEPRECATED
-    float metallic;                  // DEPRECATED
-    tinyobj::material_t tinyobj_mat; // TinyObjLoader material
+    glm::vec3 base_color; // DEPRECATED
+    float roughness;      // DEPRECATED
+    float metallic;       // DEPRECATED
+    // tinyobj::material_t tinyobj_mat; // TinyObjLoader material
 
     Material() : base_color(0.8f, 0.8f, 0.8f), roughness(0.5f), metallic(0.0f) {}
 
@@ -15,6 +15,6 @@ struct Material {
         : base_color(color), roughness(rough), metallic(metal) {}
 
     Material(const tinyobj::material_t &mat)
-        : base_color(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]), roughness(mat.roughness), metallic(mat.metallic),
-          tinyobj_mat(mat) {}
+        : base_color(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]), roughness(mat.roughness), metallic(mat.metallic) {
+    }
 };
