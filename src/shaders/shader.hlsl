@@ -27,7 +27,7 @@ struct Material {
     int displacement_tex_id;
     int alpha_tex_id;
     int reflection_tex_id;
-}
+};
 
 struct HoverInfo {
 	int hovered_entity_id;
@@ -240,6 +240,82 @@ float3 SampleHemisphereCosine(float3 n, inout uint seed) {
     return normalize(tangent * local_dir.x + bitangent * local_dir.y + n * local_dir.z);
 }
 
+float3 EvalBRDF(Material mat, float3 N, float3 L, float3 V) {
+    float3 result = float3(0, 0, 0);
+    
+    // Diffuse
+    if (mat.illum >= 1) {
+        result += mat.diffuse / PI;
+    }
+    
+    // Specular (Blinn-Phong)
+    if (mat.illum >= 2) {
+        float3 H = normalize(L + V);
+        float ndoth = max(0.0, dot(N, H));
+        if (ndoth > 0.0) {
+            float spec_power = max(1.0, mat.shininess);
+            float norm = (spec_power + 2.0) / (8.0 * PI);
+            float spec = pow(ndoth, spec_power) * norm;
+            result += mat.specular * spec;
+        }
+    }
+    return result;
+}
+
+void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 next_dir, out float3 throughput) {
+    // Default to absorption
+    next_dir = float3(0, 1, 0);
+    throughput = float3(0, 0, 0);
+    
+    if (mat.illum == 5) {
+        // Perfect Reflection
+        next_dir = reflect(-V, N);
+        throughput = mat.specular; 
+        return;
+    }
+    
+    // For Illum 2 (Phong), mix diffuse and specular
+    float lum_diff = dot(mat.diffuse, float3(0.2126, 0.7152, 0.0722));
+    float lum_spec = dot(mat.specular, float3(0.2126, 0.7152, 0.0722));
+    
+    // If illum < 2, force diffuse
+    float prob_spec = 0.0;
+    if (mat.illum >= 2 && (lum_diff + lum_spec) > 1e-6) {
+        prob_spec = lum_spec / (lum_diff + lum_spec);
+    }
+    
+    if (rnd(seed) < prob_spec) {
+        // Sample Specular (Blinn-Phong)
+        float spec_power = max(1.0, mat.shininess);
+        float alpha = acos(pow(rnd(seed), 1.0 / (spec_power + 1.0)));
+        float phi = 2.0 * PI * rnd(seed);
+        
+        float sin_alpha = sin(alpha);
+        float cos_alpha = cos(alpha);
+        
+        float3 H_local = float3(sin_alpha * cos(phi), sin_alpha * sin(phi), cos_alpha);
+        
+        // Transform H to world space
+        float3 up = abs(N.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+        float3 tangent = normalize(cross(up, N));
+        float3 bitangent = cross(N, tangent);
+        float3 H = normalize(tangent * H_local.x + bitangent * H_local.y + N * H_local.z);
+        
+        next_dir = reflect(-V, H);
+        
+        if (dot(next_dir, N) <= 0.0) {
+            throughput = float3(0, 0, 0);
+            return;
+        }
+        
+        throughput = mat.specular / prob_spec;
+    } else {
+        // Sample Diffuse
+        next_dir = SampleHemisphereCosine(N, seed);
+        throughput = mat.diffuse / (1.0 - prob_spec);
+    }
+}
+
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
     if (payload.is_shadow) {
         payload.hit = true; // Occluded
@@ -317,7 +393,8 @@ float3 SampleHemisphereCosine(float3 n, inout uint seed) {
             if (!shadow_payload.hit) {
                 // Visible
                 float atten = light.intensity / (dist * dist);
-                direct_light += light.color * atten * ndotl * mat.base_color / PI; // Diffuse assumption for direct light
+                float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
+                direct_light += light.color * atten * ndotl * brdf;
             }
         }
     }
@@ -342,42 +419,19 @@ float3 SampleHemisphereCosine(float3 n, inout uint seed) {
             TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadow_ray, shadow_payload);
             
             if (!shadow_payload.hit) {
-                direct_light += light.color * light.intensity * ndotl * mat.base_color / PI;
+                float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
+                direct_light += light.color * light.intensity * ndotl * brdf;
             }
         }
     }
     
-    payload.color = direct_light;
+    payload.color = direct_light + mat.emission;
     
-    // Indirect Bounce (Simple Material Model)
-    // Decide between specular and diffuse based on metallic
+    // Indirect Bounce
     float3 next_dir;
     float3 throughput_val;
     
-    float rand_val = rnd(payload.seed);
-    
-    // Simple mix: Metallic surfaces are purely specular. Dielectric are Diffuse + Specular (Fresnel).
-    // For simplicity:
-    // If metallic > rand: Specular bounce (tinted)
-    // Else: Diffuse bounce (Lambertian)
-    
-    if (rand_val < mat.metallic) {
-        // Specular (Metal)
-        float3 reflected = reflect(WorldRayDirection(), world_normal);
-        // Jitter for roughness
-        float3 random_vec = float3(rnd(payload.seed) * 2 - 1, rnd(payload.seed) * 2 - 1, rnd(payload.seed) * 2 - 1);
-        next_dir = normalize(reflected + random_vec * mat.roughness);
-        
-        // Check if below surface
-        if (dot(next_dir, world_normal) < 0) next_dir = reflected; // Simple fix
-        
-        throughput_val = mat.base_color; // Metals tint reflection
-    } else {
-        // Dielectric
-        // Simple Lambertian Diffuse
-        next_dir = SampleHemisphereCosine(world_normal, payload.seed);
-        throughput_val = mat.base_color;
-    }
+    SampleBRDF(mat, world_normal, -WorldRayDirection(), payload.seed, next_dir, throughput_val);
     
     payload.throughput = throughput_val;
     payload.direction = next_dir;
