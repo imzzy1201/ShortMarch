@@ -7,11 +7,15 @@ class Entity {
   public:
     Entity(const std::string &obj_file_path, const Material &material = Material(),
            const glm::mat4 &transform = glm::mat4(1.0f));
+    Entity(grassland::Mesh<float> &&mesh, const Material &material = Material(),
+           const glm::mat4 &transform = glm::mat4(1.0f));
 
     ~Entity();
 
     // Load mesh from OBJ file
     bool LoadMesh(const std::string &obj_file_path);
+    static std::vector<std::unique_ptr<Entity>>
+    LoadEntitiesFromObjWithMaterials(const std::string &obj_file_path, const glm::mat4 &transform = glm::mat4(1.0f));
 
     // Getters
     grassland::graphics::Buffer *GetVertexBuffer() const { return vertex_buffer_.get(); }
