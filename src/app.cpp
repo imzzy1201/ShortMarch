@@ -3,6 +3,9 @@
 #include "Material.h"
 
 #include "glm/gtc/matrix_transform.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include "imgui.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
