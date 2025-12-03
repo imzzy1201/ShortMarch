@@ -19,8 +19,37 @@ void Scene::AddEntity(std::shared_ptr<Entity> entity) {
 
 void Scene::Clear() {
     entities_.clear();
+    point_lights_.clear();
+    area_lights_.clear();
+    sun_lights_.clear();
     tlas_.reset();
     materials_buffer_.reset();
+    global_vertex_buffer_.reset();
+    global_index_buffer_.reset();
+    instance_info_buffer_.reset();
+    lights_buffer_.reset();
+    area_lights_buffer_.reset();
+    sun_lights_buffer_.reset();
+    scene_info_buffer_.reset();
+    grassland::LogInfo("Cleared scene");
+}
+
+void Scene::AddPointLight(const PointLight &light) {
+    point_lights_.push_back(light);
+    UpdateLightsBuffer();
+    grassland::LogInfo("Added point light to scene (total: {})", point_lights_.size());
+}
+
+void Scene::AddAreaLight(const AreaLight &light) {
+    area_lights_.push_back(light);
+    UpdateLightsBuffer();
+    grassland::LogInfo("Added area light to scene (total: {})", area_lights_.size());
+}
+
+void Scene::AddSunLight(const SunLight &light) {
+    sun_lights_.push_back(light);
+    UpdateLightsBuffer();
+    grassland::LogInfo("Added sun light to scene (total: {})", sun_lights_.size());
 }
 
 void Scene::BuildAccelerationStructures() {
@@ -57,6 +86,8 @@ void Scene::BuildAccelerationStructures() {
 
     // Update materials buffer
     UpdateMaterialsBuffer();
+    // Update global vertex/index/instance info buffers
+    UpdateGlobalBuffers();
 }
 
 void Scene::UpdateInstances() {
@@ -106,4 +137,106 @@ void Scene::UpdateMaterialsBuffer() {
 
     materials_buffer_->UploadData(materials.data(), buffer_size);
     grassland::LogInfo("Updated materials buffer with {} materials", materials.size());
+}
+
+void Scene::UpdateGlobalBuffers() {
+    if (entities_.empty()) {
+        return;
+    }
+
+    std::vector<glm::vec3> all_vertices;
+    std::vector<uint32_t> all_indices;
+    std::vector<InstanceInfo> instance_infos;
+
+    uint32_t current_vertex_offset = 0;
+    uint32_t current_index_offset = 0;
+
+    for (const auto &entity : entities_) {
+        const auto &mesh = entity->GetMesh();
+
+        // Append vertices (convert from Eigen::Vector3<float> to glm::vec3)
+        const auto *eigen_positions = mesh.Positions();
+        for (size_t vi = 0; vi < mesh.NumVertices(); ++vi) {
+            const auto &p = eigen_positions[vi];
+            all_vertices.emplace_back(p.x(), p.y(), p.z());
+        }
+
+        // Append indices
+        const uint32_t *indices = mesh.Indices();
+        all_indices.insert(all_indices.end(), indices, indices + mesh.NumIndices());
+
+        // Record offsets
+        InstanceInfo info;
+        info.vertex_offset = current_vertex_offset;
+        info.index_offset = current_index_offset;
+        instance_infos.push_back(info);
+
+        current_vertex_offset += mesh.NumVertices();
+        current_index_offset += mesh.NumIndices();
+    }
+
+    // Create/Update buffers
+    if (!global_vertex_buffer_ || global_vertex_buffer_->Size() < all_vertices.size() * sizeof(glm::vec3)) {
+        core_->CreateBuffer(all_vertices.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+                            &global_vertex_buffer_);
+    }
+    global_vertex_buffer_->UploadData(all_vertices.data(), all_vertices.size() * sizeof(glm::vec3));
+
+    if (!global_index_buffer_ || global_index_buffer_->Size() < all_indices.size() * sizeof(uint32_t)) {
+        core_->CreateBuffer(all_indices.size() * sizeof(uint32_t), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+                            &global_index_buffer_);
+    }
+    global_index_buffer_->UploadData(all_indices.data(), all_indices.size() * sizeof(uint32_t));
+
+    if (!instance_info_buffer_ || instance_info_buffer_->Size() < instance_infos.size() * sizeof(InstanceInfo)) {
+        core_->CreateBuffer(instance_infos.size() * sizeof(InstanceInfo), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+                            &instance_info_buffer_);
+    }
+    instance_info_buffer_->UploadData(instance_infos.data(), instance_infos.size() * sizeof(InstanceInfo));
+
+    grassland::LogInfo("Updated global buffers: {} vertices, {} indices", all_vertices.size(), all_indices.size());
+}
+
+void Scene::UpdateLightsBuffer() {
+    // Update SceneInfo
+    SceneInfo info;
+    info.num_point_lights = static_cast<uint32_t>(point_lights_.size());
+    info.num_area_lights = static_cast<uint32_t>(area_lights_.size());
+    info.num_sun_lights = static_cast<uint32_t>(sun_lights_.size());
+    info._pad = 0;
+
+    if (!scene_info_buffer_) {
+        core_->CreateBuffer(sizeof(SceneInfo), grassland::graphics::BUFFER_TYPE_DYNAMIC, &scene_info_buffer_);
+    }
+    scene_info_buffer_->UploadData(&info, sizeof(SceneInfo));
+
+    // Update Point Lights
+    if (!point_lights_.empty()) {
+        size_t buffer_size = point_lights_.size() * sizeof(PointLight);
+        if (!lights_buffer_ || lights_buffer_->Size() < buffer_size) {
+            core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &lights_buffer_);
+        }
+        lights_buffer_->UploadData(point_lights_.data(), buffer_size);
+    }
+
+    // Update Area Lights
+    if (!area_lights_.empty()) {
+        size_t buffer_size = area_lights_.size() * sizeof(AreaLight);
+        if (!area_lights_buffer_ || area_lights_buffer_->Size() < buffer_size) {
+            core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &area_lights_buffer_);
+        }
+        area_lights_buffer_->UploadData(area_lights_.data(), buffer_size);
+    }
+
+    // Update Sun Lights
+    if (!sun_lights_.empty()) {
+        size_t buffer_size = sun_lights_.size() * sizeof(SunLight);
+        if (!sun_lights_buffer_ || sun_lights_buffer_->Size() < buffer_size) {
+            core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &sun_lights_buffer_);
+        }
+        sun_lights_buffer_->UploadData(sun_lights_.data(), buffer_size);
+    }
+
+    grassland::LogInfo("Updated lights buffer: {} point lights, {} area lights, {} sun lights", point_lights_.size(),
+                       area_lights_.size(), sun_lights_.size());
 }

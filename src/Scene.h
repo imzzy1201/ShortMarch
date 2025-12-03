@@ -5,6 +5,44 @@
 #include <memory>
 #include <vector>
 
+struct InstanceInfo {
+    uint32_t vertex_offset;
+    uint32_t index_offset;
+    uint32_t _pad[2];
+};
+
+struct PointLight {
+    glm::vec3 position;
+    float intensity;
+    glm::vec3 color;
+    float _pad;
+};
+
+struct AreaLight {
+    glm::vec3 position;
+    float intensity;
+    glm::vec3 color;
+    float _pad0;
+    glm::vec3 u;
+    float _pad1;
+    glm::vec3 v;
+    float _pad2;
+};
+
+struct SunLight {
+    glm::vec3 direction;
+    float intensity;
+    glm::vec3 color;
+    float _pad;
+};
+
+struct SceneInfo {
+    uint32_t num_point_lights;
+    uint32_t num_area_lights;
+    uint32_t num_sun_lights;
+    uint32_t _pad;
+};
+
 // Scene manages a collection of entities and builds the TLAS
 class Scene {
   public:
@@ -13,6 +51,15 @@ class Scene {
 
     // Add an entity to the scene
     void AddEntity(std::shared_ptr<Entity> entity);
+
+    // Add a light to the scene
+    void AddLight(const PointLight &light);
+
+    // Add an area light to the scene
+    void AddAreaLight(const AreaLight &light);
+
+    // Add a sun light to the scene
+    void AddSunLight(const SunLight &light);
 
     // Remove all entities
     void Clear();
@@ -28,6 +75,13 @@ class Scene {
 
     // Get materials buffer for all entities
     grassland::graphics::Buffer *GetMaterialsBuffer() const { return materials_buffer_.get(); }
+    grassland::graphics::Buffer *GetGlobalVertexBuffer() const { return global_vertex_buffer_.get(); }
+    grassland::graphics::Buffer *GetGlobalIndexBuffer() const { return global_index_buffer_.get(); }
+    grassland::graphics::Buffer *GetInstanceInfoBuffer() const { return instance_info_buffer_.get(); }
+    grassland::graphics::Buffer *GetLightsBuffer() const { return lights_buffer_.get(); }
+    grassland::graphics::Buffer *GetAreaLightsBuffer() const { return area_lights_buffer_.get(); }
+    grassland::graphics::Buffer *GetSunLightsBuffer() const { return sun_lights_buffer_.get(); }
+    grassland::graphics::Buffer *GetSceneInfoBuffer() const { return scene_info_buffer_.get(); }
 
     // Get all entities
     const std::vector<std::shared_ptr<Entity>> &GetEntities() const { return entities_; }
@@ -37,9 +91,21 @@ class Scene {
 
   private:
     void UpdateMaterialsBuffer();
+    void UpdateGlobalBuffers();
+    void UpdateLightsBuffer();
 
     grassland::graphics::Core *core_;
     std::vector<std::shared_ptr<Entity>> entities_;
+    std::vector<PointLight> point_lights_;
+    std::vector<AreaLight> area_lights_;
+    std::vector<SunLight> sun_lights_;
     std::unique_ptr<grassland::graphics::AccelerationStructure> tlas_;
     std::unique_ptr<grassland::graphics::Buffer> materials_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> global_vertex_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> global_index_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> instance_info_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> lights_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> area_lights_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> sun_lights_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> scene_info_buffer_;
 };
