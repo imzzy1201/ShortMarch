@@ -9,14 +9,14 @@ struct Material {
     float metallic = 0.0f;                              // DEPRECATED
 
     glm::vec3 ambient = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 diffuse = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
     glm::vec3 specular = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 transmittance = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 emission = glm::vec3(0.0f, 0.0f, 0.0f);
     float shininess = 1.0f;
     float ior = 1.0f;      // index of refraction
     float dissolve = 1.0f; // 1 == opaque; 0 == fully transparent
-    int illum = 0;         // illumination model
+    int illum = 0;         // illumination` model
 
     int ambient_tex_id = -1;
     int diffuse_tex_id = -1;

@@ -5,10 +5,29 @@ struct CameraInfo {
 };
 
 struct Material {
-	float3 base_color;
-	float roughness;
-	float metallic;
-};
+    float3 base_color;  // DEPRECATED
+    float roughness;    // DEPRECATED
+    float metallic;     // DEPRECATED
+
+    float3 ambient;
+    float3 diffuse;
+    float3 specular;
+    float3 transmittance;
+    float3 emission;
+    float shininess;
+    float ior;       // index of refraction
+    float dissolve;  // 1 == opaque; 0 == fully transparent
+    int illum;       // illumination model
+
+    int ambient_tex_id;
+    int diffuse_tex_id;
+    int specular_tex_id;
+    int specular_highlight_tex_id;
+    int bump_tex_id;
+    int displacement_tex_id;
+    int alpha_tex_id;
+    int reflection_tex_id;
+}
 
 struct HoverInfo {
 	int hovered_entity_id;
