@@ -228,24 +228,24 @@ void Application::OnInit() {
     // point_light.intensity = 60.0f;
     point_light.intensity = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
-    scene_->AddLight(point_light); // coridor_ceiling_light
+    scene_->AddPointLight(point_light); // coridor_ceiling_light
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
     point_light.intensity = 1.0f;
 
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
-    scene_->AddLight(point_light); // lamp0_light
+    scene_->AddPointLight(point_light); // lamp0_light
     point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -2.7301f, 2.67885f) + lamp_light_delta);
-    scene_->AddLight(point_light); // lamp1_light
+    scene_->AddPointLight(point_light); // lamp1_light
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -0.667536f, 2.67885f) + lamp_light_delta);
-    scene_->AddLight(point_light); // lamp2_light
+    scene_->AddPointLight(point_light); // lamp2_light
     point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -0.667536f, 2.67885f) + lamp_light_delta);
-    scene_->AddLight(point_light); // lamp3_light
+    scene_->AddPointLight(point_light); // lamp3_light
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, 1.41361f, 2.67885f) + lamp_light_delta);
-    scene_->AddLight(point_light); // lamp4_light
+    scene_->AddPointLight(point_light); // lamp4_light
     point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, 1.41361f, 2.67885f) + lamp_light_delta);
-    scene_->AddLight(point_light); // lamp5_light
+    scene_->AddPointLight(point_light); // lamp5_light
 
     // Add area lights
     AreaLight area_light;
