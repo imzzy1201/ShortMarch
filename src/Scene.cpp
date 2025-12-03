@@ -30,7 +30,7 @@ void Scene::Clear() {
     global_texcoord_buffer_.reset();
     global_tangent_buffer_.reset();
     instance_info_buffer_.reset();
-    lights_buffer_.reset();
+    point_lights_buffer_.reset();
     area_lights_buffer_.reset();
     sun_lights_buffer_.reset();
     scene_info_buffer_.reset();
@@ -242,10 +242,10 @@ void Scene::UpdateLightsBuffer() {
 
     // Update Point Lights
     size_t buffer_size = point_lights_.size() * sizeof(PointLight);
-    if (!lights_buffer_ || lights_buffer_->Size() < buffer_size) {
-        core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &lights_buffer_);
+    if (!point_lights_buffer_ || point_lights_buffer_->Size() < buffer_size) {
+        core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &point_lights_buffer_);
     }
-    lights_buffer_->UploadData(point_lights_.data(), buffer_size);
+    point_lights_buffer_->UploadData(point_lights_.data(), buffer_size);
 
     // Update Area Lights
     size_t buffer_size = area_lights_.size() * sizeof(AreaLight);

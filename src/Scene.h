@@ -84,7 +84,7 @@ class Scene {
     grassland::graphics::Buffer *GetGlobalTexcoordBuffer() const { return global_texcoord_buffer_.get(); }
     grassland::graphics::Buffer *GetGlobalTangentBuffer() const { return global_tangent_buffer_.get(); }
     grassland::graphics::Buffer *GetInstanceInfoBuffer() const { return instance_info_buffer_.get(); }
-    grassland::graphics::Buffer *GetLightsBuffer() const { return lights_buffer_.get(); }
+    grassland::graphics::Buffer *GetPointLightsBuffer() const { return point_lights_buffer_.get(); }
     grassland::graphics::Buffer *GetAreaLightsBuffer() const { return area_lights_buffer_.get(); }
     grassland::graphics::Buffer *GetSunLightsBuffer() const { return sun_lights_buffer_.get(); }
     grassland::graphics::Buffer *GetSceneInfoBuffer() const { return scene_info_buffer_.get(); }
@@ -113,7 +113,7 @@ class Scene {
     std::unique_ptr<grassland::graphics::Buffer> global_tangent_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> instance_info_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> materials_buffer_;
-    std::unique_ptr<grassland::graphics::Buffer> lights_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> point_lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> area_lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> sun_lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> scene_info_buffer_;

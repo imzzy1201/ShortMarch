@@ -240,6 +240,29 @@ void Application::OnInit() {
         scene_->AddEntity(blue_cube);
     }
 
+    // Add a point light
+    PointLight light;
+    light.position = glm::vec3(2.0f, 5.0f, 2.0f);
+    light.intensity = 10.0f;
+    light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    scene_->AddLight(light);
+
+    // Add an area light
+    AreaLight area_light;
+    area_light.position = glm::vec3(-2.0f, 5.0f, 2.0f);
+    area_light.intensity = 5.0f;
+    area_light.color = glm::vec3(1.0f, 0.8f, 0.6f);
+    area_light.u = glm::vec3(1.0f, 0.0f, 0.0f);
+    area_light.v = glm::vec3(0.0f, 0.0f, 1.0f);
+    scene_->AddAreaLight(area_light);
+
+    // Add a sun light
+    SunLight sun_light;
+    sun_light.direction = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.5f));
+    sun_light.intensity = 2.0f;
+    sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
+    scene_->AddSunLight(sun_light);
+
     // Build acceleration structures
     scene_->BuildAccelerationStructures();
 
@@ -302,6 +325,16 @@ void Application::OnInit() {
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1); // space5 - entity ID output
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1); // space6 - accumulated color
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1); // space7 - accumulated samples
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space8 - point lights
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space9 - area lights
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space10 - sun lights
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1); // space11 - scene info
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space12 - instance info
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space13 - vertex positions
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space14 - index buffer
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space15 - normals
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space16 - texcoords
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space17 - tangents
     program_->Finalize();
 }
 
@@ -756,6 +789,22 @@ void Application::OnRender() {
                                       grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(7, {film_->GetAccumulatedSamplesImage()},
                                       grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(8, {scene_->GetPointLightsBuffer()}, grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(9, {scene_->GetAreaLightsBuffer()}, grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(10, {scene_->GetSunLightsBuffer()}, grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(11, {scene_->GetSceneInfoBuffer()}, grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(12, {scene_->GetInstanceInfoBuffer()},
+                                      grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(13, {scene_->GetGlobalVertexBuffer()},
+                                      grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(14, {scene_->GetGlobalIndexBuffer()}, grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(15, {scene_->GetGlobalNormalBuffer()},
+                                      grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(16, {scene_->GetGlobalTexcoordBuffer()},
+                                      grassland::graphics::BIND_POINT_RAYTRACING);
+    command_context->CmdBindResources(17, {scene_->GetGlobalTangentBuffer()},
+                                      grassland::graphics::BIND_POINT_RAYTRACING);
+
     command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
 
     // When camera is disabled, increment sample count and use accumulated image
