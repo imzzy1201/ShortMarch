@@ -228,14 +228,14 @@ void Application::OnInit() {
     // Add point lights
     PointLight point_light;
     point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    // point_light.intensity = 60.0f;
-    point_light.intensity = 0.0f;
+    point_light.intensity = 60.0f;
+    // point_light.intensity = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
     scene_->AddPointLight(point_light); // coridor_ceiling_light
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.intensity = 1.0f;
+    point_light.intensity = 60.0f;
 
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
     scene_->AddPointLight(point_light); // lamp0_light
@@ -282,9 +282,9 @@ void Application::OnInit() {
 
     // Add sun light
     SunLight sun_light;
-    // sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, 0.4791f)));
-    sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
-    sun_light.intensity = 100.0f;
+    sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, 0.4791f)));
+    // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
+    sun_light.intensity = 10.0f;
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
 
