@@ -26,6 +26,9 @@ void Scene::Clear() {
     materials_buffer_.reset();
     global_vertex_buffer_.reset();
     global_index_buffer_.reset();
+    global_normal_buffer_.reset();
+    global_texcoord_buffer_.reset();
+    global_tangent_buffer_.reset();
     instance_info_buffer_.reset();
     lights_buffer_.reset();
     area_lights_buffer_.reset();
@@ -150,6 +153,9 @@ void Scene::UpdateGlobalBuffers() {
 
     uint32_t current_vertex_offset = 0;
     uint32_t current_index_offset = 0;
+    uint32_t current_normal_offset = 0;
+    uint32_t current_texcoord_offset = 0;
+    uint32_t current_tangent_offset = 0;
 
     for (const auto &entity : entities_) {
         const auto &mesh = entity->GetMesh();
@@ -169,10 +175,16 @@ void Scene::UpdateGlobalBuffers() {
         InstanceInfo info;
         info.vertex_offset = current_vertex_offset;
         info.index_offset = current_index_offset;
+        info.normal_offset = current_normal_offset;
+        info.texcoord_offset = current_texcoord_offset;
+        info.tangent_offset = current_tangent_offset;
         instance_infos.push_back(info);
 
         current_vertex_offset += mesh.NumVertices();
         current_index_offset += mesh.NumIndices();
+        current_normal_offset += mesh.NumVertices();
+        current_texcoord_offset += mesh.NumVertices();
+        current_tangent_offset += mesh.NumVertices();
     }
 
     // Create/Update buffers
@@ -187,6 +199,24 @@ void Scene::UpdateGlobalBuffers() {
                             &global_index_buffer_);
     }
     global_index_buffer_->UploadData(all_indices.data(), all_indices.size() * sizeof(uint32_t));
+
+    if (!global_normal_buffer_ || global_normal_buffer_->Size() < all_vertices.size() * sizeof(glm::vec3)) {
+        core_->CreateBuffer(all_vertices.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+                            &global_normal_buffer_);
+    }
+    global_normal_buffer_->UploadData(all_vertices.data(), all_vertices.size() * sizeof(glm::vec3));
+
+    if (!global_texcoord_buffer_ || global_texcoord_buffer_->Size() < all_vertices.size() * sizeof(glm::vec2)) {
+        core_->CreateBuffer(all_vertices.size() * sizeof(glm::vec2), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+                            &global_texcoord_buffer_);
+    }
+    global_texcoord_buffer_->UploadData(all_vertices.data(), all_vertices.size() * sizeof(glm::vec2));
+
+    if (!global_tangent_buffer_ || global_tangent_buffer_->Size() < all_vertices.size() * sizeof(glm::vec3)) {
+        core_->CreateBuffer(all_vertices.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+                            &global_tangent_buffer_);
+    }
+    global_tangent_buffer_->UploadData(all_vertices.data(), all_vertices.size() * sizeof(glm::vec3));
 
     if (!instance_info_buffer_ || instance_info_buffer_->Size() < instance_infos.size() * sizeof(InstanceInfo)) {
         core_->CreateBuffer(instance_infos.size() * sizeof(InstanceInfo), grassland::graphics::BUFFER_TYPE_DYNAMIC,
@@ -211,31 +241,25 @@ void Scene::UpdateLightsBuffer() {
     scene_info_buffer_->UploadData(&info, sizeof(SceneInfo));
 
     // Update Point Lights
-    if (!point_lights_.empty()) {
-        size_t buffer_size = point_lights_.size() * sizeof(PointLight);
-        if (!lights_buffer_ || lights_buffer_->Size() < buffer_size) {
-            core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &lights_buffer_);
-        }
-        lights_buffer_->UploadData(point_lights_.data(), buffer_size);
+    size_t buffer_size = point_lights_.size() * sizeof(PointLight);
+    if (!lights_buffer_ || lights_buffer_->Size() < buffer_size) {
+        core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &lights_buffer_);
     }
+    lights_buffer_->UploadData(point_lights_.data(), buffer_size);
 
     // Update Area Lights
-    if (!area_lights_.empty()) {
-        size_t buffer_size = area_lights_.size() * sizeof(AreaLight);
-        if (!area_lights_buffer_ || area_lights_buffer_->Size() < buffer_size) {
-            core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &area_lights_buffer_);
-        }
-        area_lights_buffer_->UploadData(area_lights_.data(), buffer_size);
+    size_t buffer_size = area_lights_.size() * sizeof(AreaLight);
+    if (!area_lights_buffer_ || area_lights_buffer_->Size() < buffer_size) {
+        core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &area_lights_buffer_);
     }
+    area_lights_buffer_->UploadData(area_lights_.data(), buffer_size);
 
     // Update Sun Lights
-    if (!sun_lights_.empty()) {
-        size_t buffer_size = sun_lights_.size() * sizeof(SunLight);
-        if (!sun_lights_buffer_ || sun_lights_buffer_->Size() < buffer_size) {
-            core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &sun_lights_buffer_);
-        }
-        sun_lights_buffer_->UploadData(sun_lights_.data(), buffer_size);
+    size_t buffer_size = sun_lights_.size() * sizeof(SunLight);
+    if (!sun_lights_buffer_ || sun_lights_buffer_->Size() < buffer_size) {
+        core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &sun_lights_buffer_);
     }
+    sun_lights_buffer_->UploadData(sun_lights_.data(), buffer_size);
 
     grassland::LogInfo("Updated lights buffer: {} point lights, {} area lights, {} sun lights", point_lights_.size(),
                        area_lights_.size(), sun_lights_.size());

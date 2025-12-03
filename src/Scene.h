@@ -8,7 +8,10 @@
 struct InstanceInfo {
     uint32_t vertex_offset;
     uint32_t index_offset;
-    uint32_t _pad[2];
+    uint32_t normal_offset;
+    uint32_t texcoord_offset;
+    uint32_t tangent_offset;
+    uint32_t _pad[3];
 };
 
 struct PointLight {
@@ -77,6 +80,9 @@ class Scene {
     grassland::graphics::Buffer *GetMaterialsBuffer() const { return materials_buffer_.get(); }
     grassland::graphics::Buffer *GetGlobalVertexBuffer() const { return global_vertex_buffer_.get(); }
     grassland::graphics::Buffer *GetGlobalIndexBuffer() const { return global_index_buffer_.get(); }
+    grassland::graphics::Buffer *GetGlobalNormalBuffer() const { return global_normal_buffer_.get(); }
+    grassland::graphics::Buffer *GetGlobalTexcoordBuffer() const { return global_texcoord_buffer_.get(); }
+    grassland::graphics::Buffer *GetGlobalTangentBuffer() const { return global_tangent_buffer_.get(); }
     grassland::graphics::Buffer *GetInstanceInfoBuffer() const { return instance_info_buffer_.get(); }
     grassland::graphics::Buffer *GetLightsBuffer() const { return lights_buffer_.get(); }
     grassland::graphics::Buffer *GetAreaLightsBuffer() const { return area_lights_buffer_.get(); }
@@ -100,10 +106,13 @@ class Scene {
     std::vector<AreaLight> area_lights_;
     std::vector<SunLight> sun_lights_;
     std::unique_ptr<grassland::graphics::AccelerationStructure> tlas_;
-    std::unique_ptr<grassland::graphics::Buffer> materials_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> global_vertex_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> global_index_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> global_normal_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> global_texcoord_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> global_tangent_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> instance_info_buffer_;
+    std::unique_ptr<grassland::graphics::Buffer> materials_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> area_lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> sun_lights_buffer_;
