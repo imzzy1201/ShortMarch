@@ -7,14 +7,8 @@ struct Material {
     float roughness;
     float metallic;
 
-    Material()
-        : base_color(0.8f, 0.8f, 0.8f)
-        , roughness(0.5f)
-        , metallic(0.0f) {}
+    Material() : base_color(0.8f, 0.8f, 0.8f), roughness(0.5f), metallic(0.0f) {}
 
-    Material(const glm::vec3& color, float rough = 0.5f, float metal = 0.0f)
-        : base_color(color)
-        , roughness(rough)
-        , metallic(metal) {}
+    Material(const glm::vec3 &color, float rough = 0.5f, float metal = 0.0f)
+        : base_color(color), roughness(rough), metallic(metal) {}
 };
-
