@@ -245,23 +245,23 @@ void Application::OnInit() {
     light.position = glm::vec3(2.0f, 5.0f, 2.0f);
     light.intensity = 10.0f;
     light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    scene_->AddLight(light);
+    scene_->AddPointLight(light);
 
-    // Add an area light
-    AreaLight area_light;
-    area_light.position = glm::vec3(-2.0f, 5.0f, 2.0f);
-    area_light.intensity = 5.0f;
-    area_light.color = glm::vec3(1.0f, 0.8f, 0.6f);
-    area_light.u = glm::vec3(1.0f, 0.0f, 0.0f);
-    area_light.v = glm::vec3(0.0f, 0.0f, 1.0f);
-    scene_->AddAreaLight(area_light);
+    // // Add an area light
+    // AreaLight area_light;
+    // area_light.position = glm::vec3(-2.0f, 5.0f, 2.0f);
+    // area_light.intensity = 5.0f;
+    // area_light.color = glm::vec3(1.0f, 0.8f, 0.6f);
+    // area_light.u = glm::vec3(1.0f, 0.0f, 0.0f);
+    // area_light.v = glm::vec3(0.0f, 0.0f, 1.0f);
+    // scene_->AddAreaLight(area_light);
 
-    // Add a sun light
-    SunLight sun_light;
-    sun_light.direction = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.5f));
-    sun_light.intensity = 2.0f;
-    sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
-    scene_->AddSunLight(sun_light);
+    // // Add a sun light
+    // SunLight sun_light;
+    // sun_light.direction = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.5f));
+    // sun_light.intensity = 2.0f;
+    // sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
+    // scene_->AddSunLight(sun_light);
 
     // Build acceleration structures
     scene_->BuildAccelerationStructures();

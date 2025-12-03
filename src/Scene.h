@@ -56,7 +56,7 @@ class Scene {
     void AddEntity(std::shared_ptr<Entity> entity);
 
     // Add a light to the scene
-    void AddLight(const PointLight &light);
+    void AddPointLight(const PointLight &light);
 
     // Add an area light to the scene
     void AddAreaLight(const AreaLight &light);

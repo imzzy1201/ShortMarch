@@ -26,6 +26,7 @@ class Entity {
     const Material &GetMaterial() const { return material_; }
     const glm::mat4 &GetTransform() const { return transform_; }
     grassland::graphics::AccelerationStructure *GetBLAS() const { return blas_.get(); }
+    const grassland::Mesh<float> &GetMesh() const { return mesh_; }
 
     // Setters
     void SetMaterial(const Material &material) { material_ = material; }
