@@ -45,6 +45,21 @@ void Entity::BuildBLAS(grassland::graphics::Core *core) {
     core->CreateBuffer(index_buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &index_buffer_);
     index_buffer_->UploadData(mesh_.Indices(), index_buffer_size);
 
+    // Create normal buffer
+    size_t normal_buffer_size = mesh_.NumVertices() * sizeof(glm::vec3);
+    core->CreateBuffer(normal_buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &normal_buffer_);
+    normal_buffer_->UploadData(mesh_.Normals(), normal_buffer_size);
+
+    // Create texcoord buffer
+    size_t texcoord_buffer_size = mesh_.NumVertices() * sizeof(glm::vec2);
+    core->CreateBuffer(texcoord_buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &texcoord_buffer_);
+    texcoord_buffer_->UploadData(mesh_.TexCoords(), texcoord_buffer_size);
+
+    // Create tangent buffer
+    size_t tangent_buffer_size = mesh_.NumVertices() * sizeof(glm::vec3);
+    core->CreateBuffer(tangent_buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &tangent_buffer_);
+    tangent_buffer_->UploadData(mesh_.Tangents(), tangent_buffer_size);
+
     // Build BLAS
     core->CreateBottomLevelAccelerationStructure(vertex_buffer_.get(), index_buffer_.get(), sizeof(glm::vec3), &blas_);
 
