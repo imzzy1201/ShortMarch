@@ -177,6 +177,9 @@ void Application::OnMouseButton(int button, int action, int mods, double xpos, d
     }
 }
 
+// glm::vec3 blenderCoordsToGLM(const float b[3]) { return glm::vec3(b[0], b[2], -b[1]); }
+glm::vec3 blenderCoordsToGLM(glm::vec3 b) { return glm::vec3(b[0], b[2], -b[1]); }
+
 void Application::OnInit() {
     alive_ = true;
     core_->CreateWindowObject(1280, 720,
@@ -208,60 +211,136 @@ void Application::OnInit() {
     // Create scene
     scene_ = std::make_unique<Scene>(core_.get());
 
-    // Add entities to the scene
-    // Ground plane - a cube scaled to be flat
     {
-        auto ground = std::make_shared<Entity>(
-            "meshes/cube.obj", Material(glm::vec3(0.8f, 0.8f, 0.8f), 0.8f, 0.0f),
-            glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)), glm::vec3(10.0f, 0.1f, 10.0f)));
-        scene_->AddEntity(ground);
+        auto ents = Entity::LoadEntitiesFromObjWithMaterials("meshes/classroom.obj");
+        for (auto &up : ents) {
+            if (!up)
+                continue;
+            // transfer ownership into a shared_ptr for Scene
+            std::shared_ptr<Entity> sp(up.release());
+            scene_->AddEntity(sp);
+        }
     }
 
-    // Red sphere (using octahedron as sphere substitute)
-    {
-        auto red_sphere =
-            std::make_shared<Entity>("meshes/octahedron.obj", Material(glm::vec3(1.0f, 0.2f, 0.2f), 0.3f, 0.0f),
-                                     glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.5f, 0.0f)));
-        scene_->AddEntity(red_sphere);
-    }
+    // Add point lights
+    PointLight point_light;
+    point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
+    // point_light.intensity = 60.0f;
+    point_light.intensity = 0.0f;
+    point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
+    scene_->AddLight(point_light); // coridor_ceiling_light
 
-    // Green metallic sphere
-    {
-        auto green_sphere =
-            std::make_shared<Entity>("meshes/octahedron.obj", Material(glm::vec3(0.2f, 1.0f, 0.2f), 0.2f, 0.8f),
-                                     glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f)));
-        scene_->AddEntity(green_sphere);
-    }
+    glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
+    point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    point_light.intensity = 1.0f;
 
-    // Blue cube
-    {
-        auto blue_cube = std::make_shared<Entity>("meshes/cube.obj", Material(glm::vec3(0.2f, 0.2f, 1.0f), 0.5f, 0.0f),
-                                                  glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.5f, 0.0f)));
-        scene_->AddEntity(blue_cube);
-    }
+    point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
+    scene_->AddLight(point_light); // lamp0_light
+    point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -2.7301f, 2.67885f) + lamp_light_delta);
+    scene_->AddLight(point_light); // lamp1_light
+    point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -0.667536f, 2.67885f) + lamp_light_delta);
+    scene_->AddLight(point_light); // lamp2_light
+    point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -0.667536f, 2.67885f) + lamp_light_delta);
+    scene_->AddLight(point_light); // lamp3_light
+    point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, 1.41361f, 2.67885f) + lamp_light_delta);
+    scene_->AddLight(point_light); // lamp4_light
+    point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, 1.41361f, 2.67885f) + lamp_light_delta);
+    scene_->AddLight(point_light); // lamp5_light
 
-    // Add a point light
-    PointLight light;
-    light.position = glm::vec3(2.0f, 5.0f, 2.0f);
-    light.intensity = 10.0f;
-    light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    scene_->AddPointLight(light);
+    // Add area lights
+    AreaLight area_light;
+    glm::vec3 blackBoard_light_center = glm::vec3(0.897793f, 3.11939f, 1.9841f);
+    glm::vec3 blackBoard_light_size = glm::vec3(2.43f, 0.108f, 0.0f);
+    area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
+    // float power = 0.785f;
+    float power = 0;
+    area_light.intensity = power / (blackBoard_light_size.x * blackBoard_light_size.y);
+    area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    area_light.u = blenderCoordsToGLM(glm::vec3(2.43f, 0.0f, 0.0f));
+    area_light.v = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
+    scene_->AddAreaLight(area_light); // blackBoard_light
 
-    // // Add an area light
-    // AreaLight area_light;
-    // area_light.position = glm::vec3(-2.0f, 5.0f, 2.0f);
-    // area_light.intensity = 5.0f;
-    // area_light.color = glm::vec3(1.0f, 0.8f, 0.6f);
-    // area_light.u = glm::vec3(1.0f, 0.0f, 0.0f);
-    // area_light.v = glm::vec3(0.0f, 0.0f, 1.0f);
-    // scene_->AddAreaLight(area_light);
+    glm::vec3 exterior_fillLight_center = glm::vec3(-4.04989f, -0.609926f, 2.59676f);
+    glm::vec3 exterior_fillLight_dx = glm::vec3(0.75f, 0.0f, 0.0f);
+    glm::vec3 exterior_fillLight_dy = glm::vec3(0.0f, 8.3f, 0.0f);
+    // rotate by quat w=0.398227, x=0, y=-0.917, z=0
+    glm::quat rotation = glm::quat(glm::vec4(0.398227f, 0.0f, -0.917f, 0.0f));
+    glm::vec3 rotated_dx = rotation * exterior_fillLight_dx;
+    glm::vec3 rotated_dy = rotation * exterior_fillLight_dy;
+    // power = 1963.5f;
+    power = 0;
+    area_light.intensity = power / (glm::length(exterior_fillLight_dx) * glm::length(exterior_fillLight_dy));
+    area_light.position =
+        blenderCoordsToGLM(exterior_fillLight_center - 0.5f * exterior_fillLight_dx - 0.5f * exterior_fillLight_dy);
+    area_light.color = glm::vec3(1.0f, 0.965f, 0.912f);
+    area_light.u = blenderCoordsToGLM(rotated_dx);
+    area_light.v = blenderCoordsToGLM(rotated_dy);
+    scene_->AddAreaLight(area_light); // exterior_fillLight
 
-    // // Add a sun light
-    // SunLight sun_light;
-    // sun_light.direction = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.5f));
-    // sun_light.intensity = 2.0f;
-    // sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
-    // scene_->AddSunLight(sun_light);
+    // Add sun light
+    SunLight sun_light;
+    // sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, 0.4791f)));
+    sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
+    sun_light.intensity = 100.0f;
+    sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
+    scene_->AddSunLight(sun_light); // sun_light
+
+    // // Add entities to the scene
+    // // Ground plane - a cube scaled to be flat
+    // {
+    //     auto ground = std::make_shared<Entity>(
+    //         "meshes/cube.obj", Material(glm::vec3(0.8f, 0.8f, 0.8f), 0.8f, 0.0f),
+    //         glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)), glm::vec3(10.0f,
+    //         0.1f, 10.0f)));
+    //     scene_->AddEntity(ground);
+    // }
+
+    // // Red sphere (using octahedron as sphere substitute)
+    // {
+    //     auto red_sphere =
+    //         std::make_shared<Entity>("meshes/octahedron.obj", Material(glm::vec3(1.0f, 0.2f, 0.2f), 0.3f, 0.0f),
+    //                                  glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.5f, 0.0f)));
+    //     scene_->AddEntity(red_sphere);
+    // }
+
+    // // Green metallic sphere
+    // {
+    //     auto green_sphere =
+    //         std::make_shared<Entity>("meshes/octahedron.obj", Material(glm::vec3(0.2f, 1.0f, 0.2f), 0.2f, 0.8f),
+    //                                  glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f)));
+    //     scene_->AddEntity(green_sphere);
+    // }
+
+    // // Blue cube
+    // {
+    //     auto blue_cube = std::make_shared<Entity>("meshes/cube.obj", Material(glm::vec3(0.2f, 0.2f, 1.0f), 0.5f,
+    //     0.0f),
+    //                                               glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.5f, 0.0f)));
+    //     scene_->AddEntity(blue_cube);
+    // }
+
+    // // Add a point light
+    // PointLight light;
+    // light.position = glm::vec3(2.0f, 5.0f, 2.0f);
+    // light.intensity = 10.0f;
+    // light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    // scene_->AddPointLight(light);
+
+    // // // Add an area light
+    // // AreaLight area_light;
+    // // area_light.position = glm::vec3(-2.0f, 5.0f, 2.0f);
+    // // area_light.intensity = 5.0f;
+    // // area_light.color = glm::vec3(1.0f, 0.8f, 0.6f);
+    // // area_light.u = glm::vec3(1.0f, 0.0f, 0.0f);
+    // // area_light.v = glm::vec3(0.0f, 0.0f, 1.0f);
+    // // scene_->AddAreaLight(area_light);
+
+    // // // Add a sun light
+    // // SunLight sun_light;
+    // // sun_light.direction = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.5f));
+    // // sun_light.intensity = 2.0f;
+    // // sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
+    // // scene_->AddSunLight(sun_light);
 
     // Build acceleration structures
     scene_->BuildAccelerationStructures();
