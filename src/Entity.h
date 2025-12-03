@@ -20,9 +20,6 @@ class Entity {
     // Getters
     grassland::graphics::Buffer *GetVertexBuffer() const { return vertex_buffer_.get(); }
     grassland::graphics::Buffer *GetIndexBuffer() const { return index_buffer_.get(); }
-    grassland::graphics::Buffer *GetNormalBuffer() const { return normal_buffer_.get(); }
-    grassland::graphics::Buffer *GetTexcoordBuffer() const { return texcoord_buffer_.get(); }
-    grassland::graphics::Buffer *GetTangentBuffer() const { return tangent_buffer_.get(); }
     const Material &GetMaterial() const { return material_; }
     const glm::mat4 &GetTransform() const { return transform_; }
     grassland::graphics::AccelerationStructure *GetBLAS() const { return blas_.get(); }
@@ -45,9 +42,6 @@ class Entity {
 
     std::unique_ptr<grassland::graphics::Buffer> vertex_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> index_buffer_;
-    std::unique_ptr<grassland::graphics::Buffer> normal_buffer_;
-    std::unique_ptr<grassland::graphics::Buffer> texcoord_buffer_;
-    std::unique_ptr<grassland::graphics::Buffer> tangent_buffer_;
     std::unique_ptr<grassland::graphics::AccelerationStructure> blas_;
 
     bool mesh_loaded_;
