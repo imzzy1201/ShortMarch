@@ -182,7 +182,7 @@ void Scene::UpdateGlobalBuffers() {
         }
 
         // Append texcoords
-        const auto *eigen_texcoords = mesh.Texcoords();
+        const auto *eigen_texcoords = mesh.TexCoords();
         for (size_t ti = 0; ti < mesh.NumVertices(); ++ti) {
             const auto &tc = eigen_texcoords[ti];
             all_texcoords.emplace_back(tc.x(), tc.y());
