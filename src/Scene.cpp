@@ -149,6 +149,9 @@ void Scene::UpdateGlobalBuffers() {
 
     std::vector<glm::vec3> all_vertices;
     std::vector<uint32_t> all_indices;
+    std::vector<glm::vec3> all_normals;
+    std::vector<glm::vec2> all_texcoords;
+    std::vector<glm::vec3> all_tangents;
     std::vector<InstanceInfo> instance_infos;
 
     uint32_t current_vertex_offset = 0;
@@ -170,6 +173,27 @@ void Scene::UpdateGlobalBuffers() {
         // Append indices
         const uint32_t *indices = mesh.Indices();
         all_indices.insert(all_indices.end(), indices, indices + mesh.NumIndices());
+
+        // Append normals
+        const auto *eigen_normals = mesh.Normals();
+        for (size_t ni = 0; ni < mesh.NumVertices(); ++ni) {
+            const auto &n = eigen_normals[ni];
+            all_normals.emplace_back(n.x(), n.y(), n.z());
+        }
+
+        // Append texcoords
+        const auto *eigen_texcoords = mesh.Texcoords();
+        for (size_t ti = 0; ti < mesh.NumVertices(); ++ti) {
+            const auto &tc = eigen_texcoords[ti];
+            all_texcoords.emplace_back(tc.x(), tc.y());
+        }
+
+        // Append tangents
+        const auto *eigen_tangents = mesh.Tangents();
+        for (size_t tai = 0; tai < mesh.NumVertices(); ++tai) {
+            const auto &tan = eigen_tangents[tai];
+            all_tangents.emplace_back(tan.x(), tan.y(), tan.z());
+        }
 
         // Record offsets
         InstanceInfo info;
@@ -200,23 +224,23 @@ void Scene::UpdateGlobalBuffers() {
     }
     global_index_buffer_->UploadData(all_indices.data(), all_indices.size() * sizeof(uint32_t));
 
-    if (!global_normal_buffer_ || global_normal_buffer_->Size() < all_vertices.size() * sizeof(glm::vec3)) {
-        core_->CreateBuffer(all_vertices.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+    if (!global_normal_buffer_ || global_normal_buffer_->Size() < all_normals.size() * sizeof(glm::vec3)) {
+        core_->CreateBuffer(all_normals.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC,
                             &global_normal_buffer_);
     }
-    global_normal_buffer_->UploadData(all_vertices.data(), all_vertices.size() * sizeof(glm::vec3));
+    global_normal_buffer_->UploadData(all_normals.data(), all_normals.size() * sizeof(glm::vec3));
 
-    if (!global_texcoord_buffer_ || global_texcoord_buffer_->Size() < all_vertices.size() * sizeof(glm::vec2)) {
-        core_->CreateBuffer(all_vertices.size() * sizeof(glm::vec2), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+    if (!global_texcoord_buffer_ || global_texcoord_buffer_->Size() < all_texcoords.size() * sizeof(glm::vec2)) {
+        core_->CreateBuffer(all_texcoords.size() * sizeof(glm::vec2), grassland::graphics::BUFFER_TYPE_DYNAMIC,
                             &global_texcoord_buffer_);
     }
-    global_texcoord_buffer_->UploadData(all_vertices.data(), all_vertices.size() * sizeof(glm::vec2));
+    global_texcoord_buffer_->UploadData(all_texcoords.data(), all_texcoords.size() * sizeof(glm::vec2));
 
-    if (!global_tangent_buffer_ || global_tangent_buffer_->Size() < all_vertices.size() * sizeof(glm::vec3)) {
-        core_->CreateBuffer(all_vertices.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC,
+    if (!global_tangent_buffer_ || global_tangent_buffer_->Size() < all_tangents.size() * sizeof(glm::vec3)) {
+        core_->CreateBuffer(all_tangents.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC,
                             &global_tangent_buffer_);
     }
-    global_tangent_buffer_->UploadData(all_vertices.data(), all_vertices.size() * sizeof(glm::vec3));
+    global_tangent_buffer_->UploadData(all_tangents.data(), all_tangents.size() * sizeof(glm::vec3));
 
     if (!instance_info_buffer_ || instance_info_buffer_->Size() < instance_infos.size() * sizeof(InstanceInfo)) {
         core_->CreateBuffer(instance_infos.size() * sizeof(InstanceInfo), grassland::graphics::BUFFER_TYPE_DYNAMIC,

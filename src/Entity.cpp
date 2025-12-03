@@ -1,4 +1,9 @@
 #include "Entity.h"
+#include <filesystem>
+#include <map>
+#include <sstream>
+#include <string>
+#include <unordered_map>
 
 Entity::Entity(const std::string &obj_file_path, const Material &material, const glm::mat4 &transform)
     : material_(material), transform_(transform), mesh_loaded_(false) {
