@@ -8,10 +8,12 @@
 struct InstanceInfo {
     uint32_t vertex_offset;
     uint32_t index_offset;
+    uint32_t has_normal;
     uint32_t normal_offset;
+    uint32_t has_texcoord;
     uint32_t texcoord_offset;
+    uint32_t has_tangent;
     uint32_t tangent_offset;
-    uint32_t _pad[3];
 };
 
 struct PointLight {

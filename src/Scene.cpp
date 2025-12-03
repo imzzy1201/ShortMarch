@@ -162,6 +162,16 @@ void Scene::UpdateGlobalBuffers() {
 
     for (const auto &entity : entities_) {
         const auto &mesh = entity->GetMesh();
+        InstanceInfo info;
+        info.vertex_offset = current_vertex_offset;
+        info.index_offset = current_index_offset;
+        info.has_normal = mesh.Normals() ? 1 : 0;
+        info.normal_offset = current_normal_offset;
+        info.has_texcoord = mesh.TexCoords() ? 1 : 0;
+        info.texcoord_offset = current_texcoord_offset;
+        info.has_tangent = mesh.Tangents() ? 1 : 0;
+        info.tangent_offset = current_tangent_offset;
+        instance_infos.push_back(info);
 
         // Append vertices (convert from Eigen::Vector3<float> to glm::vec3)
         const auto *eigen_positions = mesh.Positions();
@@ -169,46 +179,42 @@ void Scene::UpdateGlobalBuffers() {
             const auto &p = eigen_positions[vi];
             all_vertices.emplace_back(p.x(), p.y(), p.z());
         }
+        current_vertex_offset += mesh.NumVertices();
 
         // Append indices
         const uint32_t *indices = mesh.Indices();
         all_indices.insert(all_indices.end(), indices, indices + mesh.NumIndices());
-
-        // Append normals
-        const auto *eigen_normals = mesh.Normals();
-        for (size_t ni = 0; ni < mesh.NumVertices(); ++ni) {
-            const auto &n = eigen_normals[ni];
-            all_normals.emplace_back(n.x(), n.y(), n.z());
-        }
-
-        // Append texcoords
-        const auto *eigen_texcoords = mesh.TexCoords();
-        for (size_t ti = 0; ti < mesh.NumVertices(); ++ti) {
-            const auto &tc = eigen_texcoords[ti];
-            all_texcoords.emplace_back(tc.x(), tc.y());
-        }
-
-        // Append tangents
-        const auto *eigen_tangents = mesh.Tangents();
-        for (size_t tai = 0; tai < mesh.NumVertices(); ++tai) {
-            const auto &tan = eigen_tangents[tai];
-            all_tangents.emplace_back(tan.x(), tan.y(), tan.z());
-        }
-
-        // Record offsets
-        InstanceInfo info;
-        info.vertex_offset = current_vertex_offset;
-        info.index_offset = current_index_offset;
-        info.normal_offset = current_normal_offset;
-        info.texcoord_offset = current_texcoord_offset;
-        info.tangent_offset = current_tangent_offset;
-        instance_infos.push_back(info);
-
-        current_vertex_offset += mesh.NumVertices();
         current_index_offset += mesh.NumIndices();
-        current_normal_offset += mesh.NumVertices();
-        current_texcoord_offset += mesh.NumVertices();
-        current_tangent_offset += mesh.NumVertices();
+
+        if (info.has_normal) {
+            // Append normals
+            const auto *eigen_normals = mesh.Normals();
+            for (size_t ni = 0; ni < mesh.NumVertices(); ++ni) {
+                const auto &n = eigen_normals[ni];
+                all_normals.emplace_back(n.x(), n.y(), n.z());
+            }
+            current_normal_offset += mesh.NumVertices();
+        }
+
+        if (info.has_texcoord) {
+            // Append texcoords
+            const auto *eigen_texcoords = mesh.TexCoords();
+            for (size_t ti = 0; ti < mesh.NumVertices(); ++ti) {
+                const auto &tc = eigen_texcoords[ti];
+                all_texcoords.emplace_back(tc.x(), tc.y());
+            }
+            current_texcoord_offset += mesh.NumVertices();
+        }
+
+        if (info.has_tangent) {
+            // Append tangents
+            const auto *eigen_tangents = mesh.Tangents();
+            for (size_t tai = 0; tai < mesh.NumVertices(); ++tai) {
+                const auto &tan = eigen_tangents[tai];
+                all_tangents.emplace_back(tan.x(), tan.y(), tan.z());
+            }
+            current_tangent_offset += mesh.NumVertices();
+        }
     }
 
     // Create/Update buffers
