@@ -5,41 +5,41 @@ struct CameraInfo {
 };
 
 struct Material {
-    float3 base_color;  // DEPRECATED
+    float3 base_color;  // [DEPRECATED]
 
     float3 ambient;
     float3 diffuse;
     float3 specular;
-    float3 transmittance;
+    float3 transmittance;  // [NOT USED]
     float3 emission;
-    float shininess;
-    float ior;       // index of refraction
-    float dissolve;  // 1 == opaque; 0 == fully transparent
-    int illum;       // illumination model
+    float shininess;       // [NOT USED]
+    float ior;             // index of refraction
+    float dissolve;        // 1 == opaque; 0 == fully transparent
+    int illum;             // illumination model, [NOT USED]
 
-    int ambient_tex_id;
-    int diffuse_tex_id;
-    int specular_tex_id;
-    int specular_highlight_tex_id;
-    int bump_tex_id;
-    int displacement_tex_id;
-    int alpha_tex_id;
-    int reflection_tex_id;
+    int ambient_tex_id;             // [NOT USED]
+    int diffuse_tex_id;             // [NOT USED]
+    int specular_tex_id;            // [NOT USED]
+    int specular_highlight_tex_id;  // [NOT USED]
+    int bump_tex_id;                // [NOT USED]
+    int displacement_tex_id;        // [NOT USED]
+    int alpha_tex_id;               // [NOT USED]
+    int reflection_tex_id;          // [NOT USED]
 
     // PBR extensions
     float roughness;    
     float metallic;  
-    float sheen;     
-    float clearcoat_thickness;
-    float clearcoat_roughness;
-    float anisotropy;
-    float anisotropy_rotation;
+    float sheen;                // [NOT USED]
+    float clearcoat_thickness;  // [NOT USED]
+    float clearcoat_roughness;  // [NOT USED]
+    float anisotropy;           // [NOT USED]
+    float anisotropy_rotation;  // [NOT USED]
 
-    int roughness_tex_id;
-    int metallic_tex_id;
-    int sheen_tex_id;
-    int emissive_tex_id;
-    int normal_tex_id; 
+    int roughness_tex_id;  // [NOT USED]
+    int metallic_tex_id;   // [NOT USED]
+    int sheen_tex_id;      // [NOT USED]
+    int emissive_tex_id;   // [NOT USED]
+    int normal_tex_id;     // [NOT USED]
 };
 
 struct HoverInfo {
@@ -238,152 +238,47 @@ struct RayPayload {
     payload.throughput = float3(0, 0, 0);
 }
 
-float3 SampleHemisphereCosine(float3 n, inout uint seed) {
-    float r1 = rnd(seed);
-    float r2 = rnd(seed);
-    float phi = 2.0 * PI * r1;
-    float sqrtr2 = sqrt(r2);
-    float3 local_dir = float3(sqrtr2 * cos(phi), sqrtr2 * sin(phi), sqrt(1.0 - r2));
-    
-    // Build orthonormal basis
-    float3 up = abs(n.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
-    float3 tangent = normalize(cross(up, n));
-    float3 bitangent = cross(n, tangent);
-    
-    return normalize(tangent * local_dir.x + bitangent * local_dir.y + n * local_dir.z);
+// PBR Helper Functions
+float3 FresnelSchlick(float cosTheta, float3 F0) {
+    return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
 }
 
-float3 EvalBRDF(Material mat, float3 N, float3 L, float3 V) {
-    float3 result = float3(0, 0, 0);
-    
-    if (mat.illum == 9) return float3(0, 0, 0);
-
-    // Diffuse
-    if (mat.illum >= 1) {
-        result += mat.diffuse / PI;
-    }
-    
-    // Specular (Blinn-Phong)
-    if (mat.illum == 2) {
-        float3 H = normalize(L + V);
-        float ndoth = max(0.0, dot(N, H));
-        if (ndoth > 0.0) {
-            float spec_power = max(1.0, mat.shininess);
-            float norm = (spec_power + 2.0) / (8.0 * PI);
-            float spec = pow(ndoth, spec_power) * norm;
-            result += mat.specular * spec;
-        }
-    }
-    return result;
+float DistributionGGX(float3 N, float3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+    float num = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    return num / (PI * denom * denom);
 }
 
-void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 next_dir, out float3 throughput, bool inside) {
-    // Default to absorption
-    next_dir = float3(0, 1, 0);
-    throughput = float3(0, 0, 0);
-    
-    if (mat.illum == 9) {
-        // Glass
-        float eta = inside ? mat.ior : 1.0 / mat.ior;
-        float cos_theta = dot(N, V);
-        
-        // Schlick Fresnel
-        float r0 = (1.0 - mat.ior) / (1.0 + mat.ior);
-        r0 = r0 * r0;
-        float Fr = r0 + (1.0 - r0) * pow(1.0 - cos_theta, 5.0);
-        
-        // Check TIR
-        float sin_theta2 = max(0.0, 1.0 - cos_theta * cos_theta);
-        float sin_theta_t2 = eta * eta * sin_theta2;
-        
-        if (sin_theta_t2 >= 1.0) {
-            Fr = 1.0; // Total Internal Reflection
-        }
-        
-        if (rnd(seed) < Fr) {
-            next_dir = reflect(-V, N);
-            throughput = mat.specular; 
-        } else {
-            next_dir = refract(-V, N, eta);
-            throughput = mat.transmittance; 
-            if (length(throughput) < 0.001) throughput = float3(1,1,1);
-        }
-        return;
-    }
-    
-    if (mat.illum == 5) {
-        // Perfect Reflection
-        next_dir = reflect(-V, N);
-        throughput = mat.specular; 
-        return;
-    }
-    
-    // Calculate probabilities for Diffuse vs Specular
-    float lum_diff = dot(mat.diffuse, float3(0.2126, 0.7152, 0.0722));
-    float lum_spec = dot(mat.specular, float3(0.2126, 0.7152, 0.0722));
-    
-    float prob_spec = 0.0;
-    if ((lum_diff + lum_spec) > 1e-6) {
-        prob_spec = lum_spec / (lum_diff + lum_spec);
-    }
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+    float num = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+    return num / denom;
+}
 
-    // Illum 3: Diffuse + Perfect Reflection
-    if (mat.illum == 3) {
-        if (rnd(seed) < prob_spec) {
-            next_dir = reflect(-V, N);
-            throughput = mat.specular / prob_spec;
-        } else {
-            next_dir = SampleHemisphereCosine(N, seed);
-            throughput = mat.diffuse / (1.0 - prob_spec);
-        }
-        return;
-    }
-    
-    // Illum 2: Diffuse + Glossy Specular (Blinn-Phong)
-    if (mat.illum == 2) {
-        if (rnd(seed) < prob_spec) {
-            // Sample Specular (Blinn-Phong)
-            float spec_power = max(1.0, mat.shininess);
-            float alpha = acos(pow(rnd(seed), 1.0 / (spec_power + 1.0)));
-            float phi = 2.0 * PI * rnd(seed);
-            
-            float sin_alpha = sin(alpha);
-            float cos_alpha = cos(alpha);
-            
-            float3 H_local = float3(sin_alpha * cos(phi), sin_alpha * sin(phi), cos_alpha);
-            
-            // Transform H to world space
-            float3 up = abs(N.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
-            float3 tangent = normalize(cross(up, N));
-            float3 bitangent = cross(N, tangent);
-            float3 H = normalize(tangent * H_local.x + bitangent * H_local.y + N * H_local.z);
-            
-            next_dir = reflect(-V, H);
-            
-            if (dot(next_dir, N) <= 0.0) {
-                throughput = float3(0, 0, 0);
-                return;
-            }
-            
-            throughput = mat.specular / prob_spec;
-        } else {
-            // Sample Diffuse
-            next_dir = SampleHemisphereCosine(N, seed);
-            throughput = mat.diffuse / (1.0 - prob_spec);
-        }
-        return;
-    }
+float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    return ggx1 * ggx2;
+}
 
-    // Illum 1: Diffuse only
-    if (mat.illum == 1) {
-        next_dir = SampleHemisphereCosine(N, seed);
-        throughput = mat.diffuse;
-        return;
-    }
+float3 SampleCosineHemisphere(float2 u, float3 N) {
+    float3 up = abs(N.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+    float3 tangent = normalize(cross(up, N));
+    float3 bitangent = cross(N, tangent);
     
-    // Fallback (treat as diffuse)
-    next_dir = SampleHemisphereCosine(N, seed);
-    throughput = mat.diffuse;
+    float r = sqrt(u.x);
+    float phi = 2.0 * PI * u.y;
+    
+    float3 L = normalize(tangent * (r * cos(phi)) + bitangent * (r * sin(phi)) + N * sqrt(max(0.0, 1.0 - u.x)));
+    return L;
 }
 
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
@@ -430,126 +325,185 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
     float3 world_normal = normalize(mul(ObjectToWorld3x4(), float4(n0 * bary.x + n1 * bary.y + n2 * bary.z, 0)).xyz);
     float3 world_pos = mul(ObjectToWorld3x4(), float4(v0 * bary.x + v1 * bary.y + v2 * bary.z, 1)).xyz;
     
-    // Flip normal if backfacing
-    bool inside = false;
-    if (dot(world_normal, WorldRayDirection()) > 0) {
-        world_normal = -world_normal;
-        inside = true;
-    }
-    
-    // Direct Lighting (Next Event Estimation)
-    float3 direct_light = float3(0, 0, 0);
-    
-    // Point Lights
-    for (uint i = 0; i < scene_info.num_point_lights; i++) {
-        PointLight light = point_lights[i];
-        float3 L = light.position - world_pos;
-        float dist = length(L);
-        L = normalize(L);
-        
-        float ndotl = max(0.0, dot(world_normal, L));
-        if (ndotl > 0) {
-            // Shadow ray
-            RayDesc shadow_ray;
-            shadow_ray.Origin = world_pos + world_normal * 0.001;
-            shadow_ray.Direction = L;
-            shadow_ray.TMin = 0.001;
-            shadow_ray.TMax = dist - 0.001;
-            
-            RayPayload shadow_payload;
-            shadow_payload.is_shadow = true;
-            shadow_payload.hit = true; // Assume occluded
-            
-            TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadow_ray, shadow_payload);
-            
-            if (!shadow_payload.hit) {
-                // Visible
-                float intensity = light.power * (1.0 / (4.0 * 3.14159265)) ;
-                float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
-                direct_light += light.color * intensity * ndotl * brdf / (dist * dist);
-            }
+    // Transparency
+    if (mat.dissolve < 1.0) {
+        if (rnd(payload.seed) >= mat.dissolve) {
+            payload.color = float3(0, 0, 0);
+            payload.throughput = float3(1, 1, 1);
+            payload.origin = world_pos + WorldRayDirection() * 0.001;
+            payload.direction = WorldRayDirection();
+            return;
         }
     }
     
-    // Sun Lights
-    for (uint j = 0; j < scene_info.num_sun_lights; j++) {
-        SunLight light = sun_lights[j];
-        float3 L = -normalize(light.direction);
+    float3 V = -normalize(WorldRayDirection());
+    float3 N = normalize(world_normal);
+    if (dot(N, V) < 0) N = -N;
+
+    // Material properties
+    float3 albedo = mat.diffuse;
+    float roughness = mat.roughness;
+    float metallic = mat.metallic;
+    float3 emission = mat.emission;
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+
+    // Direct Lighting
+    float3 Lo = float3(0, 0, 0);
+
+    // Point Lights
+    for (uint i = 0; i < scene_info.num_point_lights; i++) {
+        PointLight light = point_lights[i];
+        float3 L = normalize(light.position - world_pos);
+        float dist = length(light.position - world_pos);
+        float attenuation = 1.0 / (dist * dist);
+        float3 radiance = light.color * light.power * attenuation;
+
+        RayDesc shadowRay;
+        shadowRay.Origin = world_pos + N * 0.001;
+        shadowRay.Direction = L;
+        shadowRay.TMin = 0.001;
+        shadowRay.TMax = dist - 0.001;
+
+        RayPayload shadowPayload;
+        shadowPayload.is_shadow = true;
+        shadowPayload.hit = true; 
         
-        float ndotl = max(0.0, dot(world_normal, L));
-        if (ndotl > 0) {
-            RayDesc shadow_ray;
-            shadow_ray.Origin = world_pos + world_normal * 0.001;
-            shadow_ray.Direction = L;
-            shadow_ray.TMin = 0.001;
-            shadow_ray.TMax = 10000.0;
+        TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+
+        if (!shadowPayload.hit) {
+            float3 H = normalize(V + L);
+            float NdotL = max(dot(N, L), 0.0);
             
-            RayPayload shadow_payload;
-            shadow_payload.is_shadow = true;
-            shadow_payload.hit = true;
+            float NDF = DistributionGGX(N, H, roughness);
+            float G = GeometrySmith(N, V, L, roughness);
+            float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
             
-            TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadow_ray, shadow_payload);
+            float3 numerator = NDF * G * F;
+            float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
+            float3 specular = numerator / denominator;
             
-            if (!shadow_payload.hit) {
-                float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
-                direct_light += light.color * light.power * ndotl * brdf;
-            }
+            float3 kS = F;
+            float3 kD = float3(1.0, 1.0, 1.0) - kS;
+            kD *= 1.0 - metallic;
+            
+            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
         }
     }
 
     // Area Lights
     for (uint k = 0; k < scene_info.num_area_lights; k++) {
         AreaLight light = area_lights[k];
-        
-        // Sample point on light
         float r1 = rnd(payload.seed);
         float r2 = rnd(payload.seed);
-        float3 light_pos = light.position + light.u * r1 + light.v * r2;
+        float3 lightPos = light.position + light.u * r1 + light.v * r2;
         
-        float3 L_vec = light_pos - world_pos;
-        float dist_sq = dot(L_vec, L_vec);
-        float dist = sqrt(dist_sq);
-        float3 L = L_vec / dist;
+        float3 L = normalize(lightPos - world_pos);
+        float dist = length(lightPos - world_pos);
+        float attenuation = 1.0 / (dist * dist);
         
-        float ndotl = max(0.0, dot(world_normal, L));
+        float3 lightNormal = normalize(cross(light.u, light.v));
+        float NdotL_light = max(dot(-L, lightNormal), 0.0);
         
-        if (ndotl > 0) {
-            float3 light_normal = normalize(cross(light.u, light.v));
-            float ldotn = max(0.0, dot(-L, light_normal));
+        float3 radiance = (light.color * light.power / PI) * NdotL_light * attenuation;
+
+        RayDesc shadowRay;
+        shadowRay.Origin = world_pos + N * 0.001;
+        shadowRay.Direction = L;
+        shadowRay.TMin = 0.001;
+        shadowRay.TMax = dist - 0.001;
+
+        RayPayload shadowPayload;
+        shadowPayload.is_shadow = true;
+        shadowPayload.hit = true; 
+        
+        TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+
+        if (!shadowPayload.hit) {
+            float3 H = normalize(V + L);
+            float NdotL = max(dot(N, L), 0.0);
             
-            if (ldotn > 0) {
-                RayDesc shadow_ray;
-                shadow_ray.Origin = world_pos + world_normal * 0.001;
-                shadow_ray.Direction = L;
-                shadow_ray.TMin = 0.001;
-                shadow_ray.TMax = dist - 0.001;
-                
-                RayPayload shadow_payload;
-                shadow_payload.is_shadow = true;
-                shadow_payload.hit = true;
-                
-                TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadow_ray, shadow_payload);
-                
-                if (!shadow_payload.hit) {
-                    float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
-                    float area = length(cross(light.u, light.v));
-                    // Radiance L = Power / (Area * PI)
-                    float radiance = light.power / (area * 3.14159265);
-                    direct_light += light.color * radiance * brdf * ndotl * ldotn * area / dist_sq;
-                }
-            }
+            float NDF = DistributionGGX(N, H, roughness);
+            float G = GeometrySmith(N, V, L, roughness);
+            float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+            
+            float3 numerator = NDF * G * F;
+            float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
+            float3 specular = numerator / denominator;
+            
+            float3 kS = F;
+            float3 kD = float3(1.0, 1.0, 1.0) - kS;
+            kD *= 1.0 - metallic;
+            
+            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
         }
     }
+
+    // Sun Lights
+    for (uint j = 0; j < scene_info.num_sun_lights; j++) {
+        SunLight light = sun_lights[j];
+        float3 L = normalize(-light.direction);
+        float3 radiance = light.color * light.power;
+        
+        RayDesc shadowRay;
+        shadowRay.Origin = world_pos + N * 0.001;
+        shadowRay.Direction = L;
+        shadowRay.TMin = 0.001;
+        shadowRay.TMax = 10000.0;
+        
+        RayPayload shadowPayload;
+        shadowPayload.is_shadow = true;
+        shadowPayload.hit = true;
+        
+        TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+        
+        if (!shadowPayload.hit) {
+            float3 H = normalize(V + L);
+            float NdotL = max(dot(N, L), 0.0);
+            
+            float NDF = DistributionGGX(N, H, roughness);
+            float G = GeometrySmith(N, V, L, roughness);
+            float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+            
+            float3 numerator = NDF * G * F;
+            float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
+            float3 specular = numerator / denominator;
+            
+            float3 kS = F;
+            float3 kD = float3(1.0, 1.0, 1.0) - kS;
+            kD *= 1.0 - metallic;
+            
+            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+        }
+    }
+
+    payload.color = emission + Lo;
+
+    // Indirect Lighting (Next Bounce)
+    float2 u = float2(rnd(payload.seed), rnd(payload.seed));
+    float3 L_indirect = SampleCosineHemisphere(u, N);
+    float3 H_indirect = normalize(V + L_indirect);
+    float NdotL_indirect = max(dot(N, L_indirect), 0.0);
     
-    payload.color = direct_light + mat.emission;
+    if (NdotL_indirect > 0.0) {
+        float NDF = DistributionGGX(N, H_indirect, roughness);
+        float G = GeometrySmith(N, V, L_indirect, roughness);
+        float3 F = FresnelSchlick(max(dot(H_indirect, V), 0.0), F0);
+        
+        float3 numerator = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL_indirect + 0.0001;
+        float3 specular = numerator / denominator;
+        
+        float3 kS = F;
+        float3 kD = float3(1.0, 1.0, 1.0) - kS;
+        kD *= 1.0 - metallic;
+        
+        float pdf = NdotL_indirect / PI;
+        
+        payload.throughput = (kD * albedo / PI + specular) * NdotL_indirect / max(pdf, 0.001);
+    } else {
+        payload.throughput = float3(0, 0, 0);
+    }
     
-    // Indirect Bounce
-    float3 next_dir;
-    float3 throughput_val;
-    
-    SampleBRDF(mat, world_normal, -WorldRayDirection(), payload.seed, next_dir, throughput_val, inside);
-    
-    payload.throughput = throughput_val;
-    payload.direction = next_dir;
-    payload.origin = world_pos + world_normal * 0.001;
+    payload.origin = world_pos + N * 0.001;
+    payload.direction = L_indirect;
 }
