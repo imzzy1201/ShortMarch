@@ -134,8 +134,9 @@ float rnd(inout uint prev) {
 
 static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 10;
-static const float DIRECT_CLAMP = 5.50;
-static const float INDIRECT_CLAMP = 3.00;
+static const float DIRECT_CLAMP = 0.550;
+static const float INDIRECT_CLAMP = 0.300;
+static const float SENSITIVITY = 2.0;
 
 
 struct RayPayload {
@@ -226,6 +227,8 @@ struct RayPayload {
     if (any(isnan(radiance)) || any(isinf(radiance))) {
         radiance = float3(0, 0, 0);
     }
+
+    radiance = radiance * SENSITIVITY;
 
 	// Write to immediate output (for camera movement mode)
 	output[pixel_coords] = float4(radiance, 1);
