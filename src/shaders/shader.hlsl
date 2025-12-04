@@ -311,6 +311,28 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
     return L;
 }
 
+float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float roughness, float metallic, float3 F0) {
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.0);
+    
+    if (NdotL <= 0.0 || NdotV <= 0.0) return float3(0, 0, 0);
+
+    float3 H = normalize(V + L);
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    
+    float3 numerator = NDF * G * F;
+    float denominator = 4.0 * NdotV * NdotL + 0.0001;
+    float3 specular = numerator / denominator;
+    
+    float3 kS = F;
+    float3 kD = (float3(1.0, 1.0, 1.0) - kS) * (1.0 - metallic);
+    float3 diffuse = kD * albedo / PI;
+    
+    return diffuse + specular;
+}
+
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
 	// Get material index from instance
 	uint instance_id = InstanceID();
@@ -455,22 +477,9 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
         }
 
         if (!shadow_hit) {
-            float3 H = normalize(V + L);
             float NdotL = max(dot(N, L), 0.0);
-            
-            float NDF = DistributionGGX(N, H, roughness);
-            float G = GeometrySmith(N, V, L, roughness);
-            float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
-            
-            float3 numerator = NDF * G * F;
-            float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
-            float3 specular = numerator / denominator;
-            
-            float3 kS = F;
-            float3 kD = float3(1.0, 1.0, 1.0) - kS;
-            kD *= 1.0 - metallic;
-            
-            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
+            Lo += bsdf * radiance * NdotL;
         }
     }
 
@@ -529,22 +538,9 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
         }
 
         if (!shadow_hit) {
-            float3 H = normalize(V + L);
             float NdotL = max(dot(N, L), 0.0);
-            
-            float NDF = DistributionGGX(N, H, roughness);
-            float G = GeometrySmith(N, V, L, roughness);
-            float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
-            
-            float3 numerator = NDF * G * F;
-            float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
-            float3 specular = numerator / denominator;
-            
-            float3 kS = F;
-            float3 kD = float3(1.0, 1.0, 1.0) - kS;
-            kD *= 1.0 - metallic;
-            
-            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
+            Lo += bsdf * radiance * NdotL;
         }
     }
 
@@ -609,22 +605,9 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
         }
         
         if (!shadow_hit) {
-            float3 H = normalize(V + L);
             float NdotL = max(dot(N, L), 0.0);
-            
-            float NDF = DistributionGGX(N, H, roughness);
-            float G = GeometrySmith(N, V, L, roughness);
-            float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
-            
-            float3 numerator = NDF * G * F;
-            float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL + 0.0001;
-            float3 specular = numerator / denominator;
-            
-            float3 kS = F;
-            float3 kD = float3(1.0, 1.0, 1.0) - kS;
-            kD *= 1.0 - metallic;
-            
-            Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
+            Lo += bsdf * radiance * NdotL;
         }
     }
 
@@ -649,21 +632,13 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
     float NdotL_indirect = max(dot(N, L_indirect), 0.0);
     
     if (NdotL_indirect > 0.0) {
+        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0);
+        
         float3 H_indirect = normalize(V + L_indirect);
         float NdotH = max(dot(N, H_indirect), 0.0);
         float HdotV = max(dot(H_indirect, V), 0.0);
         
         float NDF = DistributionGGX(N, H_indirect, roughness);
-        float G = GeometrySmith(N, V, L_indirect, roughness);
-        float3 F = FresnelSchlick(HdotV, F0);
-        
-        float3 specular = (NDF * G * F) / (4.0 * max(dot(N, V), 0.0) * NdotL_indirect + 0.0001);
-        
-        float3 kS = F;
-        float3 kD = (float3(1.0, 1.0, 1.0) - kS) * (1.0 - metallic);
-        float3 diffuse = kD * albedo / PI;
-        
-        float3 bsdf = diffuse + specular;
         
         float pdf_spec = NDF * NdotH / (4.0 * HdotV + 0.0001);
         float pdf_diff = NdotL_indirect / PI;
