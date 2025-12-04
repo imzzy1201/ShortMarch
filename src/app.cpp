@@ -228,14 +228,14 @@ void Application::OnInit() {
     // Add point lights
     PointLight point_light;
     point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    point_light.intensity = 60.0f;
+    point_light.intensity = 5.0f;
     // point_light.intensity = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
     scene_->AddPointLight(point_light); // coridor_ceiling_light
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.intensity = 60.0f;
+    point_light.intensity = 1.0f;
 
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
     scene_->AddPointLight(point_light); // lamp0_light
@@ -282,9 +282,9 @@ void Application::OnInit() {
 
     // Add sun light
     SunLight sun_light;
-    sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, 0.4791f)));
+    sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
     // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
-    sun_light.intensity = 10.0f;
+    sun_light.intensity = 5.0f;
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
 
@@ -360,12 +360,16 @@ void Application::OnInit() {
     hover_info_buffer_->UploadData(&initial_hover, sizeof(HoverInfo));
 
     // Initialize camera state member variables
-    camera_pos_ = glm::vec3{0.0f, 1.0f, 5.0f};
-    camera_up_ = glm::vec3{0.0f, 1.0f, 0.0f}; // World up
+    // camera_pos_ = glm::vec3{0.0f, 1.0f, 5.0f};
+    // camera_up_ = glm::vec3{0.0f, 1.0f, 0.0f}; // World up
+    // camera_speed_ = 0.01f;
+    camera_pos_ = blenderCoordsToGLM(glm::vec3{ 2.54541f, -4.34681f, 1.09485f });
+    camera_up_ = glm::vec3{ 0.0f, 1.0f, 0.0f }; // World up
     camera_speed_ = 0.01f;
 
     // Initialize new mouse/view variables
-    yaw_ = -90.0f; // Point down -Z
+    //yaw_ = -90.0f; // Point down -Z
+    yaw_ = -90.0f - 14.6f; // Point down -Z
     pitch_ = 0.0f;
     last_x_ = (float)window_->GetWidth() / 2.0f;
     last_y_ = (float)window_->GetHeight() / 2.0f;
