@@ -201,7 +201,11 @@ struct RayPayload {
         // Hit
         float3 contribution = payload.color * throughput;
         if (depth > 0) {
-            contribution = min(contribution, float3(INDIRECT_CLAMP, INDIRECT_CLAMP, INDIRECT_CLAMP));
+            float contribution_norm = length(contribution);
+            if (contribution_norm > INDIRECT_CLAMP) {
+                contribution = contribution * (INDIRECT_CLAMP / contribution_norm);
+            }
+            // contribution = min(contribution, float3(INDIRECT_CLAMP, INDIRECT_CLAMP, INDIRECT_CLAMP));
         }
         radiance += contribution; // Add direct lighting
         throughput *= payload.throughput;
@@ -544,7 +548,11 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         }
     }
 
-    Lo = min(Lo, float3(DIRECT_CLAMP, DIRECT_CLAMP, DIRECT_CLAMP));
+    float Lo_norm = length(Lo);
+    if (Lo_norm > DIRECT_CLAMP) {
+        Lo = Lo * (DIRECT_CLAMP / Lo_norm);
+    }
+    // Lo = min(Lo, float3(DIRECT_CLAMP, DIRECT_CLAMP, DIRECT_CLAMP));
 
     payload.color = emission + Lo;
 
