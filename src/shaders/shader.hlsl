@@ -134,7 +134,8 @@ float rnd(inout uint prev) {
 
 static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 10;
-static const float CLAMP_VALUE = 10.0;
+static const float DIRECT_CLAMP = 5.50;
+static const float INDIRECT_CLAMP = 3.00;
 
 
 struct RayPayload {
@@ -198,7 +199,11 @@ struct RayPayload {
         }
 
         // Hit
-        radiance += min(payload.color * throughput, float3(CLAMP_VALUE, CLAMP_VALUE, CLAMP_VALUE)); // Add direct lighting
+        float3 contribution = payload.color * throughput;
+        if (depth > 0) {
+            contribution = min(contribution, float3(INDIRECT_CLAMP, INDIRECT_CLAMP, INDIRECT_CLAMP));
+        }
+        radiance += contribution; // Add direct lighting
         throughput *= payload.throughput;
         
         // Update ray for next bounce
@@ -572,6 +577,8 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
             Lo += (kD * albedo / PI + specular) * radiance * NdotL;
         }
     }
+
+    Lo = min(Lo, float3(DIRECT_CLAMP, DIRECT_CLAMP, DIRECT_CLAMP));
 
     payload.color = emission + Lo;
 
