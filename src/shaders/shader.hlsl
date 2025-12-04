@@ -133,7 +133,7 @@ float rnd(inout uint prev) {
 }
 
 static const float PI = 3.14159265359;
-static const int MAX_DEPTH = 8;
+static const int MAX_DEPTH = 10;
 
 
 struct RayPayload {
@@ -205,7 +205,7 @@ struct RayPayload {
         ray.Direction = payload.direction;
         
         // Russian Roulette
-        if (depth > 2) {
+        if (depth > 3) {
             float p = max(throughput.r, max(throughput.g, throughput.b));
             if (rnd(payload.seed) > p) break;
             throughput /= p;
@@ -256,13 +256,15 @@ float3 SampleHemisphereCosine(float3 n, inout uint seed) {
 float3 EvalBRDF(Material mat, float3 N, float3 L, float3 V) {
     float3 result = float3(0, 0, 0);
     
+    if (mat.illum == 9) return float3(0, 0, 0);
+
     // Diffuse
     if (mat.illum >= 1) {
         result += mat.diffuse / PI;
     }
     
     // Specular (Blinn-Phong)
-    if (mat.illum >= 2) {
+    if (mat.illum == 2) {
         float3 H = normalize(L + V);
         float ndoth = max(0.0, dot(N, H));
         if (ndoth > 0.0) {
@@ -275,10 +277,39 @@ float3 EvalBRDF(Material mat, float3 N, float3 L, float3 V) {
     return result;
 }
 
-void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 next_dir, out float3 throughput) {
+void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 next_dir, out float3 throughput, bool inside) {
     // Default to absorption
     next_dir = float3(0, 1, 0);
     throughput = float3(0, 0, 0);
+    
+    if (mat.illum == 9) {
+        // Glass
+        float eta = inside ? mat.ior : 1.0 / mat.ior;
+        float cos_theta = dot(N, V);
+        
+        // Schlick Fresnel
+        float r0 = (1.0 - mat.ior) / (1.0 + mat.ior);
+        r0 = r0 * r0;
+        float Fr = r0 + (1.0 - r0) * pow(1.0 - cos_theta, 5.0);
+        
+        // Check TIR
+        float sin_theta2 = max(0.0, 1.0 - cos_theta * cos_theta);
+        float sin_theta_t2 = eta * eta * sin_theta2;
+        
+        if (sin_theta_t2 >= 1.0) {
+            Fr = 1.0; // Total Internal Reflection
+        }
+        
+        if (rnd(seed) < Fr) {
+            next_dir = reflect(-V, N);
+            throughput = mat.specular; 
+        } else {
+            next_dir = refract(-V, N, eta);
+            throughput = mat.transmittance; 
+            if (length(throughput) < 0.001) throughput = float3(1,1,1);
+        }
+        return;
+    }
     
     if (mat.illum == 5) {
         // Perfect Reflection
@@ -287,46 +318,72 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
         return;
     }
     
-    // For Illum 2 (Phong), mix diffuse and specular
+    // Calculate probabilities for Diffuse vs Specular
     float lum_diff = dot(mat.diffuse, float3(0.2126, 0.7152, 0.0722));
     float lum_spec = dot(mat.specular, float3(0.2126, 0.7152, 0.0722));
     
-    // If illum < 2, force diffuse
     float prob_spec = 0.0;
-    if (mat.illum >= 2 && (lum_diff + lum_spec) > 1e-6) {
+    if ((lum_diff + lum_spec) > 1e-6) {
         prob_spec = lum_spec / (lum_diff + lum_spec);
     }
-    
-    if (rnd(seed) < prob_spec) {
-        // Sample Specular (Blinn-Phong)
-        float spec_power = max(1.0, mat.shininess);
-        float alpha = acos(pow(rnd(seed), 1.0 / (spec_power + 1.0)));
-        float phi = 2.0 * PI * rnd(seed);
-        
-        float sin_alpha = sin(alpha);
-        float cos_alpha = cos(alpha);
-        
-        float3 H_local = float3(sin_alpha * cos(phi), sin_alpha * sin(phi), cos_alpha);
-        
-        // Transform H to world space
-        float3 up = abs(N.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
-        float3 tangent = normalize(cross(up, N));
-        float3 bitangent = cross(N, tangent);
-        float3 H = normalize(tangent * H_local.x + bitangent * H_local.y + N * H_local.z);
-        
-        next_dir = reflect(-V, H);
-        
-        if (dot(next_dir, N) <= 0.0) {
-            throughput = float3(0, 0, 0);
-            return;
+
+    // Illum 3: Diffuse + Perfect Reflection
+    if (mat.illum == 3) {
+        if (rnd(seed) < prob_spec) {
+            next_dir = reflect(-V, N);
+            throughput = mat.specular / prob_spec;
+        } else {
+            next_dir = SampleHemisphereCosine(N, seed);
+            throughput = mat.diffuse / (1.0 - prob_spec);
         }
-        
-        throughput = mat.specular / prob_spec;
-    } else {
-        // Sample Diffuse
-        next_dir = SampleHemisphereCosine(N, seed);
-        throughput = mat.diffuse / (1.0 - prob_spec);
+        return;
     }
+    
+    // Illum 2: Diffuse + Glossy Specular (Blinn-Phong)
+    if (mat.illum == 2) {
+        if (rnd(seed) < prob_spec) {
+            // Sample Specular (Blinn-Phong)
+            float spec_power = max(1.0, mat.shininess);
+            float alpha = acos(pow(rnd(seed), 1.0 / (spec_power + 1.0)));
+            float phi = 2.0 * PI * rnd(seed);
+            
+            float sin_alpha = sin(alpha);
+            float cos_alpha = cos(alpha);
+            
+            float3 H_local = float3(sin_alpha * cos(phi), sin_alpha * sin(phi), cos_alpha);
+            
+            // Transform H to world space
+            float3 up = abs(N.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+            float3 tangent = normalize(cross(up, N));
+            float3 bitangent = cross(N, tangent);
+            float3 H = normalize(tangent * H_local.x + bitangent * H_local.y + N * H_local.z);
+            
+            next_dir = reflect(-V, H);
+            
+            if (dot(next_dir, N) <= 0.0) {
+                throughput = float3(0, 0, 0);
+                return;
+            }
+            
+            throughput = mat.specular / prob_spec;
+        } else {
+            // Sample Diffuse
+            next_dir = SampleHemisphereCosine(N, seed);
+            throughput = mat.diffuse / (1.0 - prob_spec);
+        }
+        return;
+    }
+
+    // Illum 1: Diffuse only
+    if (mat.illum == 1) {
+        next_dir = SampleHemisphereCosine(N, seed);
+        throughput = mat.diffuse;
+        return;
+    }
+    
+    // Fallback (treat as diffuse)
+    next_dir = SampleHemisphereCosine(N, seed);
+    throughput = mat.diffuse;
 }
 
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
@@ -374,8 +431,10 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
     float3 world_pos = mul(ObjectToWorld3x4(), float4(v0 * bary.x + v1 * bary.y + v2 * bary.z, 1)).xyz;
     
     // Flip normal if backfacing
+    bool inside = false;
     if (dot(world_normal, WorldRayDirection()) > 0) {
         world_normal = -world_normal;
+        inside = true;
     }
     
     // Direct Lighting (Next Event Estimation)
@@ -488,7 +547,7 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
     float3 next_dir;
     float3 throughput_val;
     
-    SampleBRDF(mat, world_normal, -WorldRayDirection(), payload.seed, next_dir, throughput_val);
+    SampleBRDF(mat, world_normal, -WorldRayDirection(), payload.seed, next_dir, throughput_val, inside);
     
     payload.throughput = throughput_val;
     payload.direction = next_dir;
