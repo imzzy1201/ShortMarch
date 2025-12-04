@@ -61,7 +61,7 @@ struct PointLight {
     float3 position;
     float power;
     float3 color;
-    float _pad;
+    float radius;
 };
 
 struct AreaLight {
@@ -79,7 +79,7 @@ struct SunLight {
     float3 direction;
     float power;
     float3 color;
-    float _pad;
+    float angle; // in degrees
 };
 
 struct SceneInfo {
@@ -393,8 +393,20 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
     // Point Lights
     for (uint i = 0; i < scene_info.num_point_lights; i++) {
         PointLight light = point_lights[i];
-        float3 L = normalize(light.position - world_pos);
-        float dist = length(light.position - world_pos);
+        
+        float3 lightPos = light.position;
+        if (light.radius > 0.0) {
+            float r1 = rnd(payload.seed);
+            float r2 = rnd(payload.seed);
+            float z = 1.0 - 2.0 * r1;
+            float r = sqrt(max(0.0, 1.0 - z * z));
+            float phi = 2.0 * PI * r2;
+            float3 randomDir = float3(r * cos(phi), r * sin(phi), z);
+            lightPos += randomDir * light.radius;
+        }
+
+        float3 L = normalize(lightPos - world_pos);
+        float dist = length(lightPos - world_pos);
         float attenuation = 1.0 / (dist * dist);
         float3 radiance = light.color * light.power * attenuation / (4.0 * PI);
 
@@ -535,6 +547,21 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
     for (uint j = 0; j < scene_info.num_sun_lights; j++) {
         SunLight light = sun_lights[j];
         float3 L = normalize(-light.direction);
+        
+        if (light.angle > 0.0) {
+            float r1 = rnd(payload.seed);
+            float r2 = rnd(payload.seed);
+            float radius = tan(radians(light.angle * 0.5));
+            float r = sqrt(r1) * radius;
+            float phi = 2.0 * PI * r2;
+            
+            float3 up = abs(L.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+            float3 tangent = normalize(cross(up, L));
+            float3 bitangent = cross(L, tangent);
+            
+            L = normalize(L + tangent * (r * cos(phi)) + bitangent * (r * sin(phi)));
+        }
+
         float3 radiance = light.color * light.power;
         
         float3 currentOrigin = world_pos + N * 0.001;

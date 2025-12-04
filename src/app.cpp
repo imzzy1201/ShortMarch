@@ -225,17 +225,21 @@ void Application::OnInit() {
         }
     }
 
+    float PI = 3.14159265359f;
+
     // Add point lights
     PointLight point_light;
     point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    point_light.power = 60.0f;
+    point_light.power = 60.0f * PI;
+    point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
     scene_->AddPointLight(point_light); // coridor_ceiling_light
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.power = 30.0f;
+    point_light.power = 40.0f * PI;
+    point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
     scene_->AddPointLight(point_light); // lamp0_light
@@ -284,6 +288,7 @@ void Application::OnInit() {
     sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
     // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
     sun_light.power = 15.0f;
+    sun_light.angle = 1.71874f;
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
 

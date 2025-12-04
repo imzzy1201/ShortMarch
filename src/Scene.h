@@ -20,7 +20,7 @@ struct PointLight {
     glm::vec3 position;
     float power;
     glm::vec3 color;
-    float _pad;
+    float radius;
 };
 
 struct AreaLight {
@@ -38,7 +38,7 @@ struct SunLight {
     glm::vec3 direction;
     float power;
     glm::vec3 color;
-    float _pad;
+    float angle; // in degrees
 };
 
 struct SceneInfo {
