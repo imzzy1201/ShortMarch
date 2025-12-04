@@ -134,6 +134,7 @@ float rnd(inout uint prev) {
 
 static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 10;
+static const float CLAMP_VALUE = 10.0;
 
 
 struct RayPayload {
@@ -197,7 +198,7 @@ struct RayPayload {
         }
 
         // Hit
-        radiance += payload.color * throughput; // Add direct lighting
+        radiance += min(payload.color * throughput, float3(CLAMP_VALUE, CLAMP_VALUE, CLAMP_VALUE)); // Add direct lighting
         throughput *= payload.throughput;
         
         // Update ray for next bounce
