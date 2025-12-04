@@ -229,6 +229,7 @@ struct RayPayload {
 [shader("miss")] void MissMain(inout RayPayload payload) {
     if (payload.is_shadow) {
         payload.hit = false; // Not occluded
+        payload.instance_id = 0; // Stop tracing
         return;
     }
     
@@ -283,16 +284,8 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
 }
 
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
-    if (payload.is_shadow) {
-        payload.hit = true; // Occluded
-        return;
-    }
-
-	payload.hit = true;
-	
 	// Get material index from instance
 	uint instance_id = InstanceID();
-	payload.instance_id = instance_id;
 	
 	// Load material
 	Material mat = materials[instance_id];
@@ -326,15 +319,38 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
     float3 world_normal = normalize(mul(ObjectToWorld3x4(), float4(n0 * bary.x + n1 * bary.y + n2 * bary.z, 0)).xyz);
     float3 world_pos = mul(ObjectToWorld3x4(), float4(v0 * bary.x + v1 * bary.y + v2 * bary.z, 1)).xyz;
     
-    // Transparency
+    // Transparency Check
+    bool is_transparent = false;
     if (mat.dissolve < 1.0) {
         if (rnd(payload.seed) >= mat.dissolve) {
-            payload.color = float3(0, 0, 0);
-            payload.throughput = float3(1, 1, 1);
+            is_transparent = true;
+        }
+    }
+
+    if (payload.is_shadow) {
+        if (is_transparent) {
+            payload.hit = false;
+            payload.instance_id = 1; // Signal continue
             payload.origin = world_pos + WorldRayDirection() * 0.001;
             payload.direction = WorldRayDirection();
             return;
+        } else {
+            payload.hit = true; // Occluded
+            payload.instance_id = 0; // Signal stop (opaque)
+            return;
         }
+    }
+
+	payload.hit = true;
+	payload.instance_id = instance_id;
+    
+    // Transparency (Regular Rays)
+    if (is_transparent) {
+        payload.color = float3(0, 0, 0);
+        payload.throughput = float3(1, 1, 1);
+        payload.origin = world_pos + WorldRayDirection() * 0.001;
+        payload.direction = WorldRayDirection();
+        return;
     }
     
     float3 V = -normalize(WorldRayDirection());
@@ -359,19 +375,46 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
         float attenuation = 1.0 / (dist * dist);
         float3 radiance = light.color * light.power * attenuation / (4.0 * PI);
 
-        RayDesc shadowRay;
-        shadowRay.Origin = world_pos + N * 0.001;
-        shadowRay.Direction = L;
-        shadowRay.TMin = 0.001;
-        shadowRay.TMax = dist - 0.001;
-
-        RayPayload shadowPayload;
-        shadowPayload.is_shadow = true;
-        shadowPayload.hit = true; 
+        float3 currentOrigin = world_pos + N * 0.001;
+        float currentTMax = dist - 0.001;
+        bool shadow_hit = false;
         
-        TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+        while(true) {
+            RayDesc shadowRay;
+            shadowRay.Origin = currentOrigin;
+            shadowRay.Direction = L;
+            shadowRay.TMin = 0.001;
+            shadowRay.TMax = currentTMax;
 
-        if (!shadowPayload.hit) {
+            RayPayload shadowPayload;
+            shadowPayload.is_shadow = true;
+            shadowPayload.hit = false; 
+            shadowPayload.seed = payload.seed;
+            shadowPayload.instance_id = 0;
+            
+            TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+            
+            if (shadowPayload.hit) {
+                shadow_hit = true;
+                break;
+            }
+            
+            if (shadowPayload.instance_id == 1) {
+                // Transparent hit, continue
+                currentOrigin = shadowPayload.origin;
+                float dist_remaining = length(light.position - currentOrigin);
+                currentTMax = dist_remaining - 0.001;
+                
+                if (currentTMax <= 0) break;
+                payload.seed = shadowPayload.seed; 
+                continue;
+            } else {
+                shadow_hit = false;
+                break;
+            }
+        }
+
+        if (!shadow_hit) {
             float3 H = normalize(V + L);
             float NdotL = max(dot(N, L), 0.0);
             
@@ -407,19 +450,45 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
         
         float3 radiance = (light.color * light.power / PI) * NdotL_light * attenuation;
 
-        RayDesc shadowRay;
-        shadowRay.Origin = world_pos + N * 0.001;
-        shadowRay.Direction = L;
-        shadowRay.TMin = 0.001;
-        shadowRay.TMax = dist - 0.001;
-
-        RayPayload shadowPayload;
-        shadowPayload.is_shadow = true;
-        shadowPayload.hit = true; 
+        float3 currentOrigin = world_pos + N * 0.001;
+        float currentTMax = dist - 0.001;
+        bool shadow_hit = false;
         
-        TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+        while(true) {
+            RayDesc shadowRay;
+            shadowRay.Origin = currentOrigin;
+            shadowRay.Direction = L;
+            shadowRay.TMin = 0.001;
+            shadowRay.TMax = currentTMax;
 
-        if (!shadowPayload.hit) {
+            RayPayload shadowPayload;
+            shadowPayload.is_shadow = true;
+            shadowPayload.hit = false; 
+            shadowPayload.seed = payload.seed;
+            shadowPayload.instance_id = 0;
+            
+            TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+            
+            if (shadowPayload.hit) {
+                shadow_hit = true;
+                break;
+            }
+            
+            if (shadowPayload.instance_id == 1) {
+                currentOrigin = shadowPayload.origin;
+                float dist_remaining = length(lightPos - currentOrigin);
+                currentTMax = dist_remaining - 0.001;
+                
+                if (currentTMax <= 0) break;
+                payload.seed = shadowPayload.seed; 
+                continue;
+            } else {
+                shadow_hit = false;
+                break;
+            }
+        }
+
+        if (!shadow_hit) {
             float3 H = normalize(V + L);
             float NdotL = max(dot(N, L), 0.0);
             
@@ -445,19 +514,46 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
         float3 L = normalize(-light.direction);
         float3 radiance = light.color * light.power;
         
-        RayDesc shadowRay;
-        shadowRay.Origin = world_pos + N * 0.001;
-        shadowRay.Direction = L;
-        shadowRay.TMin = 0.001;
-        shadowRay.TMax = 10000.0;
+        float3 currentOrigin = world_pos + N * 0.001;
+        float currentTMax = 10000.0;
+        bool shadow_hit = false;
         
-        RayPayload shadowPayload;
-        shadowPayload.is_shadow = true;
-        shadowPayload.hit = true;
+        while(true) {
+            RayDesc shadowRay;
+            shadowRay.Origin = currentOrigin;
+            shadowRay.Direction = L;
+            shadowRay.TMin = 0.001;
+            shadowRay.TMax = currentTMax;
+
+            RayPayload shadowPayload;
+            shadowPayload.is_shadow = true;
+            shadowPayload.hit = false; 
+            shadowPayload.seed = payload.seed;
+            shadowPayload.instance_id = 0;
+            
+            TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+            
+            if (shadowPayload.hit) {
+                shadow_hit = true;
+                break;
+            }
+            
+            if (shadowPayload.instance_id == 1) {
+                currentOrigin = shadowPayload.origin;
+                // For sun light, TMax is effectively infinite, but we need to reduce it relative to new origin?
+                // Actually TMax is relative to Origin.
+                // So we can keep it large.
+                currentTMax = 10000.0; 
+                
+                payload.seed = shadowPayload.seed; 
+                continue;
+            } else {
+                shadow_hit = false;
+                break;
+            }
+        }
         
-        TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
-        
-        if (!shadowPayload.hit) {
+        if (!shadow_hit) {
             float3 H = normalize(V + L);
             float NdotL = max(dot(N, L), 0.0);
             
