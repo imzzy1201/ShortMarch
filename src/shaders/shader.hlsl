@@ -218,6 +218,11 @@ struct RayPayload {
         }
     }
 
+    // Prevent NaN/Inf from corrupting the accumulation buffer
+    if (any(isnan(radiance)) || any(isinf(radiance))) {
+        radiance = float3(0, 0, 0);
+    }
+
 	// Write to immediate output (for camera movement mode)
 	output[pixel_coords] = float4(radiance, 1);
 	
@@ -382,7 +387,7 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
 
     // Material properties
     float3 albedo = mat.diffuse;
-    float roughness = mat.roughness;
+    float roughness = max(mat.roughness, 0.001); // Clamp roughness to prevent NaN in GGX
     float metallic = mat.metallic;
     float3 emission = mat.emission;
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);

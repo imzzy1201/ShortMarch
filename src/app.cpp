@@ -238,7 +238,7 @@ void Application::OnInit() {
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.power = 40.0f * PI;
+    point_light.power = 30.0f * PI;
     point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
