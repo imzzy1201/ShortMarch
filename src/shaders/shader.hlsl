@@ -261,8 +261,8 @@ float DistributionGGX(float3 N, float3 H, float roughness) {
 }
 
 float GeometrySchlickGGX(float NdotV, float roughness) {
-    float r = (roughness + 1.0);
-    float k = (r * r) / 8.0;
+    float a = roughness * roughness;
+    float k = a / 2.0;
     float num = NdotV;
     float denom = NdotV * (1.0 - k) + k;
     return num / denom;
@@ -274,6 +274,24 @@ float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
     float ggx1 = GeometrySchlickGGX(NdotL, roughness);
     return ggx1 * ggx2;
+}
+
+float3 SampleGGX(float2 u, float3 N, float roughness) {
+    float a = roughness * roughness;
+    float phi = 2.0 * PI * u.x;
+    float cosTheta = sqrt((1.0 - u.y) / (1.0 + (a * a - 1.0) * u.y));
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    
+    float3 H;
+    H.x = sinTheta * cos(phi);
+    H.y = sinTheta * sin(phi);
+    H.z = cosTheta;
+    
+    float3 up = abs(N.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+    float3 tangent = normalize(cross(up, N));
+    float3 bitangent = cross(N, tangent);
+    
+    return normalize(tangent * H.x + bitangent * H.y + N * H.z);
 }
 
 float3 SampleCosineHemisphere(float2 u, float3 N) {
@@ -584,26 +602,47 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
 
     // Indirect Lighting (Next Bounce)
     float2 u = float2(rnd(payload.seed), rnd(payload.seed));
-    float3 L_indirect = SampleCosineHemisphere(u, N);
-    float3 H_indirect = normalize(V + L_indirect);
+    
+    // Probability to sample specular
+    float probSpecular = lerp(0.5, 1.0, metallic);
+    float3 L_indirect;
+    
+    if (rnd(payload.seed) < probSpecular) {
+        float3 H = SampleGGX(u, N, roughness);
+        L_indirect = reflect(-V, H);
+    } else {
+        L_indirect = SampleCosineHemisphere(u, N);
+    }
+    
     float NdotL_indirect = max(dot(N, L_indirect), 0.0);
     
     if (NdotL_indirect > 0.0) {
+        float3 H_indirect = normalize(V + L_indirect);
+        float NdotH = max(dot(N, H_indirect), 0.0);
+        float HdotV = max(dot(H_indirect, V), 0.0);
+        
         float NDF = DistributionGGX(N, H_indirect, roughness);
         float G = GeometrySmith(N, V, L_indirect, roughness);
-        float3 F = FresnelSchlick(max(dot(H_indirect, V), 0.0), F0);
+        float3 F = FresnelSchlick(HdotV, F0);
         
-        float3 numerator = NDF * G * F;
-        float denominator = 4.0 * max(dot(N, V), 0.0) * NdotL_indirect + 0.0001;
-        float3 specular = numerator / denominator;
+        float3 specular = (NDF * G * F) / (4.0 * max(dot(N, V), 0.0) * NdotL_indirect + 0.0001);
         
         float3 kS = F;
-        float3 kD = float3(1.0, 1.0, 1.0) - kS;
-        kD *= 1.0 - metallic;
+        float3 kD = (float3(1.0, 1.0, 1.0) - kS) * (1.0 - metallic);
+        float3 diffuse = kD * albedo / PI;
         
-        float pdf = NdotL_indirect / PI;
+        float3 bsdf = diffuse + specular;
         
-        payload.throughput = (kD * albedo / PI + specular) * NdotL_indirect / max(pdf, 0.001);
+        float pdf_spec = NDF * NdotH / (4.0 * HdotV + 0.0001);
+        float pdf_diff = NdotL_indirect / PI;
+        
+        float pdf = probSpecular * pdf_spec + (1.0 - probSpecular) * pdf_diff;
+        
+        if (pdf > 0.001) {
+            payload.throughput = bsdf * NdotL_indirect / pdf;
+        } else {
+            payload.throughput = float3(0, 0, 0);
+        }
     } else {
         payload.throughput = float3(0, 0, 0);
     }
