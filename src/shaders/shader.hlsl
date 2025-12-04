@@ -46,14 +46,14 @@ struct InstanceInfo {
 
 struct PointLight {
     float3 position;
-    float intensity;
+    float power;
     float3 color;
     float _pad;
 };
 
 struct AreaLight {
     float3 position;
-    float intensity;
+    float power;
     float3 color;
     float _pad0;
     float3 u;
@@ -64,7 +64,7 @@ struct AreaLight {
 
 struct SunLight {
     float3 direction;
-    float intensity;
+    float power;
     float3 color;
     float _pad;
 };
@@ -392,9 +392,9 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
             
             if (!shadow_payload.hit) {
                 // Visible
-                float atten = light.intensity / (dist * dist);
+                float intensity = light.power * (1.0 / (4.0 * 3.14159265)) ;
                 float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
-                direct_light += light.color * atten * ndotl * brdf;
+                direct_light += light.color * intensity * ndotl * brdf / (dist * dist);
             }
         }
     }
@@ -420,7 +420,7 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
             
             if (!shadow_payload.hit) {
                 float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
-                direct_light += light.color * light.intensity * ndotl * brdf;
+                direct_light += light.color * light.power * ndotl * brdf;
             }
         }
     }
@@ -461,7 +461,9 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
                 if (!shadow_payload.hit) {
                     float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
                     float area = length(cross(light.u, light.v));
-                    direct_light += light.color * light.intensity * brdf * ndotl * ldotn * area / dist_sq;
+                    // Radiance L = Power / (Area * PI)
+                    float radiance = light.power / (area * 3.14159265);
+                    direct_light += light.color * radiance * brdf * ndotl * ldotn * area / dist_sq;
                 }
             }
         }

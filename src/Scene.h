@@ -18,14 +18,14 @@ struct InstanceInfo {
 
 struct PointLight {
     glm::vec3 position;
-    float intensity;
+    float power;
     glm::vec3 color;
     float _pad;
 };
 
 struct AreaLight {
     glm::vec3 position;
-    float intensity;
+    float power;
     glm::vec3 color;
     float _pad0;
     glm::vec3 u;
@@ -36,7 +36,7 @@ struct AreaLight {
 
 struct SunLight {
     glm::vec3 direction;
-    float intensity;
+    float power;
     glm::vec3 color;
     float _pad;
 };
