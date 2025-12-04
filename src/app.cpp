@@ -230,7 +230,7 @@ void Application::OnInit() {
     // Add point lights
     PointLight point_light;
     point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    point_light.power = 60.0f * PI;
+    point_light.power = 60.0f;
     point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
@@ -238,7 +238,7 @@ void Application::OnInit() {
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.power = 30.0f * PI;
+    point_light.power = 6.0f;
     point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
@@ -256,31 +256,35 @@ void Application::OnInit() {
 
     // Add area lights
     AreaLight area_light;
-    glm::vec3 blackBoard_light_center = glm::vec3(0.897793f, 3.11939f, 1.9841f);
+    glm::vec3 blackBoard_light_center = glm::vec3(0.897793f, 3.11939f, 1.9641f);
     glm::vec3 blackBoard_light_size = glm::vec3(2.43f, 0.108f, 0.0f);
     area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
     area_light.power = 0.785f;
-    area_light.power = 30.0f;
-    // area_light.power = 0.0f;
+    area_light.power = 15.0f;
+    //area_light.power = 0.0f;
     area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    area_light.u = blenderCoordsToGLM(glm::vec3(2.43f, 0.0f, 0.0f));
-    area_light.v = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
+    area_light.u = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
+    area_light.v = blenderCoordsToGLM(glm::vec3(2.43f, 0.0f, 0.0f));
     scene_->AddAreaLight(area_light); // blackBoard_light
 
-    glm::vec3 exterior_fillLight_center = glm::vec3(-4.04989f, -0.609926f, 2.59676f);
-    glm::vec3 exterior_fillLight_dx = glm::vec3(0.75f, 0.0f, 0.0f);
+    glm::vec3 exterior_fillLight_center = glm::vec3(4.04989f, -0.609926f, 2.59676f);
+    glm::vec3 exterior_fillLight_dx = glm::vec3(0.53f, 0.0f, -0.53f);
     glm::vec3 exterior_fillLight_dy = glm::vec3(0.0f, 8.3f, 0.0f);
     // rotate by quat w=0.398227, x=0, y=-0.917, z=0
-    glm::quat rotation = glm::quat(glm::vec4(0.398227f, 0.0f, -0.917f, 0.0f));
-    glm::vec3 rotated_dx = rotation * exterior_fillLight_dx;
-    glm::vec3 rotated_dy = rotation * exterior_fillLight_dy;
+    //glm::quat rotation = glm::quat(glm::vec4(0.398227f, 0.0f, -0.917f, 0.0f));
+    //glm::vec3 rotated_dx = rotation * exterior_fillLight_dx;
+    //glm::vec3 rotated_dy = rotation * exterior_fillLight_dy;
     area_light.power = 1963.5f;
-    // area_light.power = 0.0f;
+    //area_light.power = 0.0f;
     area_light.position =
         blenderCoordsToGLM(exterior_fillLight_center - 0.5f * exterior_fillLight_dx - 0.5f * exterior_fillLight_dy);
     area_light.color = glm::vec3(1.0f, 0.965f, 0.912f);
-    area_light.u = blenderCoordsToGLM(rotated_dx);
-    area_light.v = blenderCoordsToGLM(rotated_dy);
+    area_light.v = exterior_fillLight_dx;
+    area_light.u = exterior_fillLight_dy;
+    //area_light.u = blenderCoordsToGLM(rotated_dx);
+    //area_light.v = blenderCoordsToGLM(rotated_dy);
+    //grassland::LogInfo("rotated_dx: {}, {}, {}", rotated_dx.x, rotated_dx.y, rotated_dx.z);
+    //grassland::LogInfo("rotated_dy: {}, {}, {}", rotated_dy.x, rotated_dy.y, rotated_dy.z);
     scene_->AddAreaLight(area_light); // exterior_fillLight
 
     // Add sun light
@@ -548,7 +552,7 @@ void Application::OnUpdate() {
         // Update the camera buffer with new position/orientation
         CameraObject camera_object{};
         camera_object.screen_to_camera = glm::inverse(glm::perspective(
-            glm::radians(60.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
+            glm::radians(38.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
         camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
         camera_object_buffer_->UploadData(&camera_object, sizeof(CameraObject));
 

@@ -135,8 +135,8 @@ float rnd(inout uint prev) {
 
 static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 10;
-static const float DIRECT_CLAMP = 1.10;
-static const float INDIRECT_CLAMP = 0.60;
+static const float DIRECT_CLAMP = 5.50;
+static const float INDIRECT_CLAMP = 3.00;
 static const float SENSITIVITY = 1.0;
 
 float3 clamp_direct(float3 color) {
@@ -537,7 +537,8 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         float3 lightNormal = normalize(cross(light.u, light.v));
         float NdotL_light = max(dot(-L, lightNormal), 0.0);
         
-        float3 radiance = (light.color * light.power / PI) * NdotL_light * attenuation;
+        float power_area = length(cross(light.u, light.v));
+        float3 radiance = (light.color * light.power / power_area / PI) * NdotL_light * attenuation;
 
         bool shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
