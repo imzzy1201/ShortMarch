@@ -134,9 +134,25 @@ float rnd(inout uint prev) {
 
 static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 10;
-static const float DIRECT_CLAMP = 0.550;
-static const float INDIRECT_CLAMP = 0.300;
-static const float SENSITIVITY = 2.0;
+static const float DIRECT_CLAMP = 1.10;
+static const float INDIRECT_CLAMP = 0.60;
+static const float SENSITIVITY = 1.0;
+
+float3 clamp_direct(float3 color) {
+    float norm = length(color);
+    if (norm > DIRECT_CLAMP) {
+        color = color * (DIRECT_CLAMP / norm);
+    }
+    return color;
+}
+
+float3 clamp_indirect(float3 color) {
+    float norm = length(color);
+    if (norm > INDIRECT_CLAMP) {
+        color = color * (INDIRECT_CLAMP / norm);
+    }
+    return color;
+}
 
 
 struct RayPayload {
@@ -202,10 +218,7 @@ struct RayPayload {
         // Hit
         float3 contribution = payload.color * throughput;
         if (depth > 0) {
-            float contribution_norm = length(contribution);
-            if (contribution_norm > INDIRECT_CLAMP) {
-                contribution = contribution * (INDIRECT_CLAMP / contribution_norm);
-            }
+            contribution = clamp_indirect(contribution);
             // contribution = min(contribution, float3(INDIRECT_CLAMP, INDIRECT_CLAMP, INDIRECT_CLAMP));
         }
         radiance += contribution; // Add direct lighting
@@ -492,7 +505,7 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         if (!shadow_hit) {
             float NdotL = max(dot(N, L), 0.0);
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
-            Lo += bsdf * radiance * NdotL;
+            Lo += clamp_direct(bsdf * radiance * NdotL);
         }
     }
 
@@ -517,7 +530,7 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         if (!shadow_hit) {
             float NdotL = max(dot(N, L), 0.0);
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
-            Lo += bsdf * radiance * NdotL;
+            Lo += clamp_direct(bsdf * radiance * NdotL);
         }
     }
 
@@ -547,15 +560,15 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         if (!shadow_hit) {
             float NdotL = max(dot(N, L), 0.0);
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
-            Lo += bsdf * radiance * NdotL;
+            Lo += clamp_direct(bsdf * radiance * NdotL);
         }
     }
 
-    float Lo_norm = length(Lo);
-    if (Lo_norm > DIRECT_CLAMP) {
-        Lo = Lo * (DIRECT_CLAMP / Lo_norm);
-    }
-    // Lo = min(Lo, float3(DIRECT_CLAMP, DIRECT_CLAMP, DIRECT_CLAMP));
+    // float Lo_norm = length(Lo);
+    // if (Lo_norm > DIRECT_CLAMP) {
+    //     Lo = Lo * (DIRECT_CLAMP / Lo_norm);
+    // }
+    // // Lo = min(Lo, float3(DIRECT_CLAMP, DIRECT_CLAMP, DIRECT_CLAMP));
 
     payload.color = emission + Lo;
 
