@@ -1,0 +1,30 @@
+- [x] Base: Implement a path tracing algorithm that correctly handles diffuse and specular materials. (**basic**)
+- [x] Scene creation: Build a custom scene with aesthetic considerations, using geometry that you create from scratch or find online (ensure the source is credited). (**basic**, tidiness and attractiveness 1pt)
+- [x] Acceleration structure: Implement an acceleration structure such as BVH (Bounding Volume Hierarchy). This is not required for hardware-based renderers, as the acceleration structure is built-in in that case. (**basic**, Surface Area Heuristic or another advanced algorithm 2pts)
+- [ ] Material: Create a (non-trivial) custom material. Options include:
+  - [ ] Transmissive material (**basic**)
+  - [ ] Principled BSDF (2pts)
+  - [ ] Multi-layer material (2pts)
+  - [ ] Rendering of fur, hair, skin, etc. (2pts)
+- [ ] Texture: Create your own (non-trivial) texture with proper texture mapping. Options include
+  - [ ] Color texture (**basic**)
+  - [ ] Normal map, height map, attribute map, or any functional texture mapping (1pt for each, up to 2pts)
+  - [ ] Implement an adaptive mipmap algorithm (2pts)
+- [x] Importance Sampling: Use more advanced sampling algorithms for path tracing. (Importance sampling with Russian Roulette, multiple importance sampling 2pts)
+- [ ] Volumetric Rendering: Options include:
+  - [ ] Subsurface scattering (2pts)
+  - [ ] Homogeneous volume rendering (1pt)
+  - [ ] Inhomogeneous volume rendering (1pt)
+  - [ ] Channel-independent subsurface scattering (1pt)
+  - [ ] Volumetric emission (1pt)
+  - [ ] Volumetric alpha shadow (2pts)
+- [ ] Special Visual Effects: Options include:
+  - [ ] Motion blur, depth of field (**basic**)
+  - [ ] Alpha shadow (**basic**)
+  - [ ] Cartoon style rendering (2pts)
+  - [ ] Chromatic dispersion (2pts)
+- [ ] Lighting: Options include:
+  - [x] Point light and area light (**basic**)
+  - [ ] Environment lighting with HDR, such as skybox (2pts)
+- [ ] Anti-aliasing: Implement an anti-aliasing algorithm (**basic**)
+- [ ] Simulation-based content creation: Up to 2pts
