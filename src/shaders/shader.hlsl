@@ -107,7 +107,8 @@ StructuredBuffer<uint> indices : register(t0, space14);
 StructuredBuffer<float3> normals : register(t0, space15);
 StructuredBuffer<float2> texcoords : register(t0, space16);
 StructuredBuffer<float3> tangents : register(t0, space17);
-
+Texture2D<float4> material_images[] : register(t0, space18);
+SamplerState material_sampler : register(s0, space19);
 // Random Number Generator
 uint tea(uint val0, uint val1) {
     uint v0 = val0;
@@ -431,6 +432,19 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
     float3 bary = float3(1.0 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
     float3 world_normal = normalize(mul(ObjectToWorld3x4(), float4(n0 * bary.x + n1 * bary.y + n2 * bary.z, 0)).xyz);
     float3 world_pos = mul(ObjectToWorld3x4(), float4(v0 * bary.x + v1 * bary.y + v2 * bary.z, 1)).xyz;
+
+    if(info.has_texcoord && mat.diffuse_tex_id >= 0) {
+      float2 uv0=texcoords[info.texcoord_offset + idx.x];
+      float2 uv1=texcoords[info.texcoord_offset + idx.y];
+      float2 uv2=texcoords[info.texcoord_offset + idx.z];
+      float2 interp_uv = uv0 * bary.x + uv1 * bary.y + uv2 * bary.z;
+      interp_uv = frac(interp_uv);
+      interp_uv.y = 1-interp_uv.y;
+
+      float4 tex = material_images[mat.diffuse_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f);
+      tex.xyz = pow(tex.xyz, float3(2.2, 2.2, 2.2));
+      mat.diffuse = tex.xyz;
+    }
     
     // Transparency Check
     bool is_transparent = false;
