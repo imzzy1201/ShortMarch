@@ -356,7 +356,7 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
         float3 L = normalize(light.position - world_pos);
         float dist = length(light.position - world_pos);
         float attenuation = 1.0 / (dist * dist);
-        float3 radiance = light.color * light.power * attenuation;
+        float3 radiance = light.color * light.power * attenuation / (4.0 * PI);
 
         RayDesc shadowRay;
         shadowRay.Origin = world_pos + N * 0.001;
