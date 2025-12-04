@@ -6,8 +6,6 @@ struct CameraInfo {
 
 struct Material {
     float3 base_color;  // DEPRECATED
-    float roughness;    // DEPRECATED
-    float metallic;     // DEPRECATED
 
     float3 ambient;
     float3 diffuse;
@@ -27,6 +25,21 @@ struct Material {
     int displacement_tex_id;
     int alpha_tex_id;
     int reflection_tex_id;
+
+    // PBR extensions
+    float roughness;    
+    float metallic;  
+    float sheen;     
+    float clearcoat_thickness;
+    float clearcoat_roughness;
+    float anisotropy;
+    float anisotropy_rotation;
+
+    int roughness_tex_id;
+    int metallic_tex_id;
+    int sheen_tex_id;
+    int emissive_tex_id;
+    int normal_tex_id; 
 };
 
 struct HoverInfo {
