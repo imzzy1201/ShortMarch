@@ -424,6 +424,48 @@ void SampleBRDF(Material mat, float3 N, float3 V, inout uint seed, out float3 ne
             }
         }
     }
+
+    // Area Lights
+    for (uint k = 0; k < scene_info.num_area_lights; k++) {
+        AreaLight light = area_lights[k];
+        
+        // Sample point on light
+        float r1 = rnd(payload.seed);
+        float r2 = rnd(payload.seed);
+        float3 light_pos = light.position + light.u * r1 + light.v * r2;
+        
+        float3 L_vec = light_pos - world_pos;
+        float dist_sq = dot(L_vec, L_vec);
+        float dist = sqrt(dist_sq);
+        float3 L = L_vec / dist;
+        
+        float ndotl = max(0.0, dot(world_normal, L));
+        
+        if (ndotl > 0) {
+            float3 light_normal = normalize(cross(light.u, light.v));
+            float ldotn = max(0.0, dot(-L, light_normal));
+            
+            if (ldotn > 0) {
+                RayDesc shadow_ray;
+                shadow_ray.Origin = world_pos + world_normal * 0.001;
+                shadow_ray.Direction = L;
+                shadow_ray.TMin = 0.001;
+                shadow_ray.TMax = dist - 0.001;
+                
+                RayPayload shadow_payload;
+                shadow_payload.is_shadow = true;
+                shadow_payload.hit = true;
+                
+                TraceRay(as, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, 0xFF, 0, 1, 0, shadow_ray, shadow_payload);
+                
+                if (!shadow_payload.hit) {
+                    float3 brdf = EvalBRDF(mat, world_normal, L, -WorldRayDirection());
+                    float area = length(cross(light.u, light.v));
+                    direct_light += light.color * light.intensity * brdf * ndotl * ldotn * area / dist_sq;
+                }
+            }
+        }
+    }
     
     payload.color = direct_light + mat.emission;
     
