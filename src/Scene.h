@@ -96,6 +96,7 @@ class Scene {
 
     // Get number of entities
     size_t GetEntityCount() const { return entities_.size(); }
+    std::vector<grassland::graphics::Image *> GetMaterialImages() const;
 
   private:
     void UpdateMaterialsBuffer();
@@ -119,4 +120,5 @@ class Scene {
     std::unique_ptr<grassland::graphics::Buffer> area_lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> sun_lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> scene_info_buffer_;
+    std::vector<std::unique_ptr<grassland::graphics::Image>> material_images_;
 };

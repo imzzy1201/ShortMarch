@@ -425,7 +425,22 @@ void Application::OnInit() {
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space15 - normals
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space16 - texcoords
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1); // space17 - tangents
+    auto material_images = scene_->GetMaterialImages();
+    int image_descriptor_count = material_images.empty() ? 1 : static_cast<int>(material_images.size());
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, image_descriptor_count); // space18
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_SAMPLER, 1); 
     program_->Finalize();
+
+    core_->CreateSampler(grassland::graphics::SamplerInfo(grassland::graphics::FILTER_MODE_LINEAR), &material_sampler_);
+
+    if (!scene_->GetMaterialImages().empty()) {
+        material_placeholder_image_.reset();
+    } else {
+        core_->CreateImage(1, 1, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &material_placeholder_image_);
+        // Upload a single white pixel (RGBA 8-bit)
+        uint8_t white_pixel[4] = { 255u, 255u, 255u, 255u };
+        material_placeholder_image_->UploadData(white_pixel);
+    }
 }
 
 void Application::OnClose() {
@@ -440,6 +455,7 @@ void Application::OnClose() {
 
     color_image_.reset();
     entity_id_image_.reset();
+    material_placeholder_image_.reset();
     camera_object_buffer_.reset();
     hover_info_buffer_.reset();
 
@@ -894,6 +910,16 @@ void Application::OnRender() {
                                       grassland::graphics::BIND_POINT_RAYTRACING);
     command_context->CmdBindResources(17, {scene_->GetGlobalTangentBuffer()},
                                       grassland::graphics::BIND_POINT_RAYTRACING);
+    auto material_images = scene_->GetMaterialImages();
+    if (!material_images.empty()) {
+        command_context->CmdBindResources(18, material_images, grassland::graphics::BIND_POINT_RAYTRACING);
+    } else if (material_placeholder_image_) {
+        std::vector<grassland::graphics::Image*> placeholder_vec = { material_placeholder_image_.get() };
+        command_context->CmdBindResources(18, placeholder_vec, grassland::graphics::BIND_POINT_RAYTRACING);
+    }
+    if (material_sampler_) {
+        command_context->CmdBindResources(19, {material_sampler_.get()}, grassland::graphics::BIND_POINT_RAYTRACING);
+    }
 
     command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
 

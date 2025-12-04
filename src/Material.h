@@ -42,6 +42,8 @@ struct Material {
     int normal_tex_id = -1;
     // TODO: add texture mapping
 
+    std::string diffuse_color_texname;
+
     // tinyobj::material_t tinyobj_mat; // TinyObjLoader material
 
     Material() : base_color(0.8f, 0.8f, 0.8f), roughness(0.5f), metallic(0.0f) {}
@@ -69,5 +71,15 @@ struct Material {
         clearcoat_roughness = mat.clearcoat_roughness;
         anisotropy = mat.anisotropy;
         anisotropy_rotation = mat.anisotropy_rotation;
+        std::string prefix_path = "meshes/";
+        if (!mat.diffuse_texname.empty()) {
+            diffuse_color_texname = prefix_path + mat.diffuse_texname;
+        } else {
+            // Some exporters put non-standard keys; check unknown_parameter for common map_Kd
+            auto it = mat.unknown_parameter.find("map_Kd");
+            if (it != mat.unknown_parameter.end()) {
+                diffuse_color_texname = prefix_path +it->second;
+            }
+        }
     }
 };

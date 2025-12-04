@@ -118,28 +118,157 @@ void Scene::UpdateInstances() {
     tlas_->UpdateInstances(instances);
 }
 
+// void Scene::UpdateMaterialsBuffer() {
+//     if (entities_.empty()) {
+//         return;
+//     }
+
+//     // Collect all materials
+//     std::vector<Material> materials;
+//     materials.reserve(entities_.size());
+
+//     for (const auto &entity : entities_) {
+//         materials.push_back(entity->GetMaterial());
+//     }
+
+//     // Create/update materials buffer
+//     size_t buffer_size = materials.size() * sizeof(Material);
+
+//     if (!materials_buffer_) {
+//         core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &materials_buffer_);
+//     }
+
+//     materials_buffer_->UploadData(materials.data(), buffer_size);
+//     grassland::LogInfo("Updated materials buffer with {} materials", materials.size());
+// }
+
+std::vector<grassland::graphics::Image *> Scene::GetMaterialImages() const {
+    std::vector<grassland::graphics::Image *> out;
+    out.reserve(material_images_.size());
+    for (const auto &u : material_images_) {
+        out.push_back(u.get());
+    }
+    return out;
+}
+
 void Scene::UpdateMaterialsBuffer() {
     if (entities_.empty()) {
         return;
     }
 
     // Collect all materials
-    std::vector<Material> materials;
-    materials.reserve(entities_.size());
+    struct GpuMaterial {
+        glm::vec3 base_color;  // [DEPRECATED]
+
+        glm::vec3 ambient;
+        glm::vec3 diffuse;
+        glm::vec3 specular;
+        glm::vec3 transmittance;  // [NOT USED]
+        glm::vec3 emission;
+        float shininess;       // [NOT USED]
+        float ior;             // index of refraction
+        float dissolve;        // 1 == opaque; 0 == fully transparent
+        int illum;             // illumination model, [NOT USED]
+
+        int ambient_tex_id;             // [NOT USED]
+        int diffuse_tex_id;             // [NOT USED]
+        int specular_tex_id;            // [NOT USED]
+        int specular_highlight_tex_id;  // [NOT USED]
+        int bump_tex_id;                // [NOT USED]
+        int displacement_tex_id;        // [NOT USED]
+        int alpha_tex_id;               // [NOT USED]
+        int reflection_tex_id;          // [NOT USED]
+
+        // PBR extensions
+        float roughness;    
+        float metallic;  
+        float sheen;                // [NOT USED]
+        float clearcoat_thickness;  // [NOT USED]
+        float clearcoat_roughness;  // [NOT USED]
+        float anisotropy;           // [NOT USED]
+        float anisotropy_rotation;  // [NOT USED]
+
+        int roughness_tex_id;  // [NOT USED]
+        int metallic_tex_id;   // [NOT USED]
+        int sheen_tex_id;      // [NOT USED]
+        int emissive_tex_id;   // [NOT USED]
+        int normal_tex_id;     // [NOT USED]
+    };
+
+
+
+    std::vector<GpuMaterial> gpu_materials;
+    gpu_materials.reserve(entities_.size());
+
+    // Ensure we have a place to store material images; clear previous
+    material_images_.clear();
+    material_images_.reserve(entities_.size());
 
     for (const auto &entity : entities_) {
-        materials.push_back(entity->GetMaterial());
+        const auto m = entity->GetMaterial();
+        GpuMaterial gm{};
+        gm.base_color = m.base_color;
+        gm.ambient = m.ambient;
+        gm.diffuse = m.diffuse;
+        gm.specular = m.specular;
+        gm.transmittance = m.transmittance;
+        gm.emission = m.emission;
+        gm.shininess = m.shininess;
+        gm.ior = m.ior;
+        gm.dissolve = m.dissolve;
+        gm.illum = m.illum;
+        gm.roughness = m.roughness;
+        gm.metallic = m.metallic;
+
+        gm.ambient_tex_id=m.ambient_tex_id;             // [NOT USED]
+        gm.diffuse_tex_id = m.diffuse_tex_id;           // [NOT USED]
+        gm.specular_tex_id = m.specular_tex_id;
+        gm.specular_highlight_tex_id = m.specular_highlight_tex_id;            // [NOT USED]
+        gm.bump_tex_id = m.bump_tex_id;  // [NOT USED]
+        gm.displacement_tex_id = m.displacement_tex_id;                // [NOT USED]
+        gm.alpha_tex_id = m.alpha_tex_id;        // [NOT USED]
+        gm.reflection_tex_id = m.reflection_tex_id; 
+                      // [NOT USED]
+        gm.roughness = m.roughness;    
+        gm.metallic = m.metallic;  
+        gm.sheen = m.sheen;                // [NOT USED]
+        gm.clearcoat_thickness = m.clearcoat_thickness;  // [NOT USED]
+        gm.clearcoat_roughness = m.clearcoat_roughness;  // [NOT USED]
+        gm.anisotropy = m.anisotropy;           // [NOT USED]
+        gm.anisotropy_rotation = m.anisotropy_rotation;  // [NOT USED]
+
+        gm.roughness_tex_id = m.roughness_tex_id;  // [NOT USED]
+        gm.metallic_tex_id = m.metallic_tex_id;   // [NOT USED]
+        gm.sheen_tex_id = m.sheen_tex_id;      // [NOT USED]
+        gm.emissive_tex_id = m.emissive_tex_id;   // [NOT USED]
+        gm.normal_tex_id = m.normal_tex_id;          // [NOT USED]
+
+        if (!m.diffuse_color_texname.empty()) {
+            std::string full_path = grassland::FindAssetFile(m.diffuse_color_texname);
+            //grassland::LogInfo("test:{} {}", m.base_color_texname,full_path);
+            if (!full_path.empty()) {
+                std::unique_ptr<grassland::graphics::Image> img;
+                int res = grassland::graphics::LoadImageFromFile(core_, full_path, &img);
+                if (res == 0 && img) {
+                    // store image and record its index
+                    gm.diffuse_tex_id = static_cast<int>(material_images_.size());
+                    grassland::LogInfo("add:{} {}", full_path,gm.diffuse_tex_id);
+                    material_images_.push_back(std::move(img));
+                }
+            }
+        }
+        gpu_materials.push_back(gm);
     }
 
-    // Create/update materials buffer
-    size_t buffer_size = materials.size() * sizeof(Material);
+    // Create/update materials buffer (upload packed GPU materials)
+    size_t buffer_size = gpu_materials.size() * sizeof(GpuMaterial);
 
     if (!materials_buffer_) {
         core_->CreateBuffer(buffer_size, grassland::graphics::BUFFER_TYPE_DYNAMIC, &materials_buffer_);
     }
 
-    materials_buffer_->UploadData(materials.data(), buffer_size);
-    grassland::LogInfo("Updated materials buffer with {} materials", materials.size());
+    materials_buffer_->UploadData(gpu_materials.data(), buffer_size);
+    grassland::LogInfo("Updated materials buffer with {} materials ({} images)", gpu_materials.size(), material_images_.size());
 }
 
 void Scene::UpdateGlobalBuffers() {

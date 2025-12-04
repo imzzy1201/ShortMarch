@@ -53,7 +53,12 @@ class Application {
     std::unique_ptr<grassland::graphics::Image> color_image_;
     std::unique_ptr<grassland::graphics::Image> entity_id_image_; // Entity ID buffer for accurate picking
     std::unique_ptr<grassland::graphics::RayTracingProgram> program_;
+
     bool alive_{false};
+
+    std::unique_ptr<grassland::graphics::Image> material_placeholder_image_;
+
+    std::unique_ptr<grassland::graphics::Sampler> material_sampler_;
 
     void ProcessInput(); // Helper function for keyboard input
 
