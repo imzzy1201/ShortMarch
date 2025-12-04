@@ -5,8 +5,6 @@
 // Simple material structure for ray tracing
 struct Material {
     glm::vec3 base_color = glm::vec3(0.8f, 0.8f, 0.8f); // DEPRECATED
-    float roughness = 0.5f;                             // DEPRECATED
-    float metallic = 0.0f;                              // DEPRECATED
 
     glm::vec3 ambient = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
@@ -26,6 +24,23 @@ struct Material {
     int displacement_tex_id = -1;
     int alpha_tex_id = -1;
     int reflection_tex_id = -1;
+    // TODO: add texture mapping
+
+    // PBR properties
+    float roughness = 0.5f;
+    float metallic = 0.0f;
+    float sheen = 0.0f;
+    float clearcoat_thickness = 0.0f;
+    float clearcoat_roughness = 0.0f;
+    float anisotropy = 0.0f;
+    float anisotropy_rotation = 0.0f;
+
+    int roughness_tex_id = -1;
+    int metallic_tex_id = -1;
+    int sheen_tex_id = -1;
+    int emissive_tex_id = -1;
+    int normal_tex_id = -1;
+    // TODO: add texture mapping
 
     // tinyobj::material_t tinyobj_mat; // TinyObjLoader material
 
@@ -34,8 +49,8 @@ struct Material {
     Material(const glm::vec3 &color, float rough = 0.5f, float metal = 0.0f)
         : base_color(color), roughness(rough), metallic(metal) {}
 
-    Material(const tinyobj::material_t &mat)
-        : base_color(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]), roughness(mat.roughness), metallic(mat.metallic) {
+    Material(const tinyobj::material_t &mat) : base_color(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]) {
+        // Basic properties
         ambient = glm::vec3(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
         diffuse = glm::vec3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
         specular = glm::vec3(mat.specular[0], mat.specular[1], mat.specular[2]);
@@ -45,5 +60,14 @@ struct Material {
         ior = mat.ior;
         dissolve = mat.dissolve;
         illum = mat.illum;
+
+        // PBR properties
+        roughness = mat.roughness;
+        metallic = mat.metallic;
+        sheen = mat.sheen;
+        clearcoat_thickness = mat.clearcoat_thickness;
+        clearcoat_roughness = mat.clearcoat_roughness;
+        anisotropy = mat.anisotropy;
+        anisotropy_rotation = mat.anisotropy_rotation;
     }
 };
