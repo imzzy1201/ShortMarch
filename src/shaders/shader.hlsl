@@ -333,6 +333,49 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
     return diffuse + specular;
 }
 
+bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 direction, float maxDistance, inout uint seed) {
+    float3 currentOrigin = origin;
+    float currentTMax = maxDistance;
+    
+    while(true) {
+        RayDesc shadowRay;
+        shadowRay.Origin = currentOrigin;
+        shadowRay.Direction = direction;
+        shadowRay.TMin = 0.001;
+        shadowRay.TMax = currentTMax;
+
+        RayPayload shadowPayload;
+        shadowPayload.is_shadow = true;
+        shadowPayload.hit = false; 
+        shadowPayload.seed = seed;
+        shadowPayload.instance_id = 0;
+        
+        TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
+        
+        if (shadowPayload.hit) {
+            return true; // Occluded
+        }
+        
+        if (shadowPayload.instance_id == 1) {
+            // Transparent hit, continue
+            float3 prevOrigin = currentOrigin;
+            currentOrigin = shadowPayload.origin;
+            
+            // Update TMax
+            float step = length(currentOrigin - prevOrigin);
+            currentTMax -= step;
+            
+            if (currentTMax <= 0.001) return false; // Reached target
+            
+            seed = shadowPayload.seed; 
+            continue;
+        } else {
+            return false; // Missed everything
+        }
+    }
+    return false;
+}
+
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
 	// Get material index from instance
 	uint instance_id = InstanceID();
@@ -437,44 +480,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         float attenuation = 1.0 / (dist * dist);
         float3 radiance = light.color * light.power * attenuation / (4.0 * PI);
 
-        float3 currentOrigin = world_pos + N * 0.001;
-        float currentTMax = dist - 0.001;
-        bool shadow_hit = false;
-        
-        while(true) {
-            RayDesc shadowRay;
-            shadowRay.Origin = currentOrigin;
-            shadowRay.Direction = L;
-            shadowRay.TMin = 0.001;
-            shadowRay.TMax = currentTMax;
-
-            RayPayload shadowPayload;
-            shadowPayload.is_shadow = true;
-            shadowPayload.hit = false; 
-            shadowPayload.seed = payload.seed;
-            shadowPayload.instance_id = 0;
-            
-            TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
-            
-            if (shadowPayload.hit) {
-                shadow_hit = true;
-                break;
-            }
-            
-            if (shadowPayload.instance_id == 1) {
-                // Transparent hit, continue
-                currentOrigin = shadowPayload.origin;
-                float dist_remaining = length(light.position - currentOrigin);
-                currentTMax = dist_remaining - 0.001;
-                
-                if (currentTMax <= 0) break;
-                payload.seed = shadowPayload.seed; 
-                continue;
-            } else {
-                shadow_hit = false;
-                break;
-            }
-        }
+        bool shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (!shadow_hit) {
             float NdotL = max(dot(N, L), 0.0);
@@ -499,43 +505,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         
         float3 radiance = (light.color * light.power / PI) * NdotL_light * attenuation;
 
-        float3 currentOrigin = world_pos + N * 0.001;
-        float currentTMax = dist - 0.001;
-        bool shadow_hit = false;
-        
-        while(true) {
-            RayDesc shadowRay;
-            shadowRay.Origin = currentOrigin;
-            shadowRay.Direction = L;
-            shadowRay.TMin = 0.001;
-            shadowRay.TMax = currentTMax;
-
-            RayPayload shadowPayload;
-            shadowPayload.is_shadow = true;
-            shadowPayload.hit = false; 
-            shadowPayload.seed = payload.seed;
-            shadowPayload.instance_id = 0;
-            
-            TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
-            
-            if (shadowPayload.hit) {
-                shadow_hit = true;
-                break;
-            }
-            
-            if (shadowPayload.instance_id == 1) {
-                currentOrigin = shadowPayload.origin;
-                float dist_remaining = length(lightPos - currentOrigin);
-                currentTMax = dist_remaining - 0.001;
-                
-                if (currentTMax <= 0) break;
-                payload.seed = shadowPayload.seed; 
-                continue;
-            } else {
-                shadow_hit = false;
-                break;
-            }
-        }
+        bool shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (!shadow_hit) {
             float NdotL = max(dot(N, L), 0.0);
@@ -565,44 +535,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
 
         float3 radiance = light.color * light.power;
         
-        float3 currentOrigin = world_pos + N * 0.001;
-        float currentTMax = 10000.0;
-        bool shadow_hit = false;
-        
-        while(true) {
-            RayDesc shadowRay;
-            shadowRay.Origin = currentOrigin;
-            shadowRay.Direction = L;
-            shadowRay.TMin = 0.001;
-            shadowRay.TMax = currentTMax;
-
-            RayPayload shadowPayload;
-            shadowPayload.is_shadow = true;
-            shadowPayload.hit = false; 
-            shadowPayload.seed = payload.seed;
-            shadowPayload.instance_id = 0;
-            
-            TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
-            
-            if (shadowPayload.hit) {
-                shadow_hit = true;
-                break;
-            }
-            
-            if (shadowPayload.instance_id == 1) {
-                currentOrigin = shadowPayload.origin;
-                // For sun light, TMax is effectively infinite, but we need to reduce it relative to new origin?
-                // Actually TMax is relative to Origin.
-                // So we can keep it large.
-                currentTMax = 10000.0; 
-                
-                payload.seed = shadowPayload.seed; 
-                continue;
-            } else {
-                shadow_hit = false;
-                break;
-            }
-        }
+        bool shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, 10000.0, payload.seed);
         
         if (!shadow_hit) {
             float NdotL = max(dot(N, L), 0.0);
