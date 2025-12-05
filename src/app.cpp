@@ -16,6 +16,8 @@
 #include <iomanip>
 #include <sstream>
 
+static const float FOVY = 46.5f;
+
 namespace {
 #include "built_in_shaders.inl"
 }
@@ -230,7 +232,7 @@ void Application::OnInit() {
     // Add point lights
     PointLight point_light;
     point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    point_light.power = 60.0f;
+    point_light.power = 20.0f;
     point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
@@ -259,8 +261,8 @@ void Application::OnInit() {
     glm::vec3 blackBoard_light_center = glm::vec3(0.897793f, 3.11939f, 1.9641f);
     glm::vec3 blackBoard_light_size = glm::vec3(2.43f, 0.108f, 0.0f);
     area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
-    area_light.power = 0.785f;
-    area_light.power = 10.0f;
+    area_light.power = 7.85f;
+    //area_light.power = 10.0f;
     //area_light.power = 0.0f;
     area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
     area_light.u = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
@@ -294,14 +296,14 @@ void Application::OnInit() {
     area_light.position = windows_light_position;
     area_light.v = windows_light_dy;
     area_light.u = windows_light_dz;
-    area_light.power = 2000.0 * windows_light_dy.length() * windows_light_dz.length();
+    area_light.power = 200.0 * windows_light_dy.length() * windows_light_dz.length();
     scene_->AddAreaLight(area_light); // windows dayLight_portal
 
     // Add sun light
     SunLight sun_light;
     sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
     // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
-    sun_light.power = 10.0f;
+    sun_light.power = 5.0f;
     sun_light.angle = 1.71874f;
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
@@ -404,7 +406,7 @@ void Application::OnInit() {
     // Set initial camera buffer data
     CameraObject camera_object{};
     camera_object.screen_to_camera = glm::inverse(
-        glm::perspective(glm::radians(38.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
+        glm::perspective(glm::radians(FOVY), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
     camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
     const float focal_length_m = 0.025f;
     const float f_stop = 2.1f;
@@ -567,7 +569,7 @@ void Application::OnUpdate() {
         // Update the camera buffer with new position/orientation
         CameraObject camera_object{};
         camera_object.screen_to_camera = glm::inverse(glm::perspective(
-            glm::radians(38.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
+            glm::radians(FOVY), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
         camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
         const float focal_length_m = 0.025f;
         const float f_stop = 2.1f;
