@@ -230,7 +230,7 @@ void Application::OnInit() {
     // Add point lights
     PointLight point_light;
     point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    point_light.power = 60.0f;
+    point_light.power = 20.0f;
     point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
@@ -238,7 +238,7 @@ void Application::OnInit() {
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.power = 6.0f;
+    point_light.power = 5.0f;
     point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
@@ -259,8 +259,8 @@ void Application::OnInit() {
     glm::vec3 blackBoard_light_center = glm::vec3(0.897793f, 3.11939f, 1.9641f);
     glm::vec3 blackBoard_light_size = glm::vec3(2.43f, 0.108f, 0.0f);
     area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
-    area_light.power = 0.785f;
-    area_light.power = 10.0f;
+    area_light.power = 7.85f;
+    //area_light.power = 10.0f;
     //area_light.power = 0.0f;
     area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
     area_light.u = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
@@ -294,14 +294,14 @@ void Application::OnInit() {
     area_light.position = windows_light_position;
     area_light.v = windows_light_dy;
     area_light.u = windows_light_dz;
-    area_light.power = 2000.0 * windows_light_dy.length() * windows_light_dz.length();
+    area_light.power = 200.0 * windows_light_dy.length() * windows_light_dz.length();
     scene_->AddAreaLight(area_light); // windows dayLight_portal
 
     // Add sun light
     SunLight sun_light;
     sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
     // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
-    sun_light.power = 10.0f;
+    sun_light.power = 5.0f;
     sun_light.angle = 1.71874f;
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
