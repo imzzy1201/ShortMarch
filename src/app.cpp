@@ -16,6 +16,8 @@
 #include <iomanip>
 #include <sstream>
 
+static const float FOVY = 46.5f;
+
 namespace {
 #include "built_in_shaders.inl"
 }
@@ -238,7 +240,7 @@ void Application::OnInit() {
 
     glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.power = 5.0f;
+    point_light.power = 6.0f;
     point_light.radius = 0.08f;
     // point_light.power = 0.0f;
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
@@ -404,7 +406,7 @@ void Application::OnInit() {
     // Set initial camera buffer data
     CameraObject camera_object{};
     camera_object.screen_to_camera = glm::inverse(
-        glm::perspective(glm::radians(38.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
+        glm::perspective(glm::radians(FOVY), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
     camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
     const float focal_length_m = 0.025f;
     const float f_stop = 2.1f;
@@ -567,7 +569,7 @@ void Application::OnUpdate() {
         // Update the camera buffer with new position/orientation
         CameraObject camera_object{};
         camera_object.screen_to_camera = glm::inverse(glm::perspective(
-            glm::radians(38.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
+            glm::radians(FOVY), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
         camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
         const float focal_length_m = 0.025f;
         const float f_stop = 2.1f;
