@@ -2,13 +2,13 @@
 - [x] Scene creation: Build a custom scene with aesthetic considerations, using geometry that you create from scratch or find online (ensure the source is credited). (**basic**, tidiness and attractiveness 1pt)
 - [x] Acceleration structure: Implement an acceleration structure such as BVH (Bounding Volume Hierarchy). This is not required for hardware-based renderers, as the acceleration structure is built-in in that case. (**basic**, Surface Area Heuristic or another advanced algorithm 2pts)
 - [ ] Material: Create a (non-trivial) custom material. Options include:
-  - [ ] Transmissive material (**basic**)
-  - [ ] Principled BSDF (2pts)
+  - [x] Transmissive material (**basic**)
+  - [x] Principled BSDF (2pts)
   - [ ] Multi-layer material (2pts)
   - [ ] Rendering of fur, hair, skin, etc. (2pts)
 - [ ] Texture: Create your own (non-trivial) texture with proper texture mapping. Options include
-  - [ ] Color texture (**basic**)
-  - [ ] Normal map, height map, attribute map, or any functional texture mapping (1pt for each, up to 2pts)
+  - [x] Color texture (**basic**)
+  - [x] Normal map, height map, attribute map, or any functional texture mapping (1pt for each, up to 2pts)
   - [ ] Implement an adaptive mipmap algorithm (2pts)
 - [x] Importance Sampling: Use more advanced sampling algorithms for path tracing. (Importance sampling with Russian Roulette, multiple importance sampling 2pts)
 - [ ] Volumetric Rendering: Options include:
@@ -20,7 +20,7 @@
   - [ ] Volumetric alpha shadow (2pts)
 - [ ] Special Visual Effects: Options include:
   - [ ] Motion blur, depth of field (**basic**)
-  - [ ] Alpha shadow (**basic**)
+  - [x] Alpha shadow (**basic**)
   - [ ] Cartoon style rendering (2pts)
   - [ ] Chromatic dispersion (2pts)
 - [ ] Lighting: Options include:

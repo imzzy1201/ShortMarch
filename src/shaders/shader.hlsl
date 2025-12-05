@@ -471,7 +471,7 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
       interp_uv.y = 1-interp_uv.y;
 
       float4 tex = material_images[mat.diffuse_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f);
-    //   tex.xyz = pow(tex.xyz, float3(2.2, 2.2, 2.2));
+       //tex.xyz = pow(tex.xyz, float3(2.2, 2.2, 2.2));
       mat.diffuse = tex.xyz;
     }
     
