@@ -260,7 +260,7 @@ void Application::OnInit() {
     glm::vec3 blackBoard_light_size = glm::vec3(2.43f, 0.108f, 0.0f);
     area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
     area_light.power = 0.785f;
-    area_light.power = 15.0f;
+    area_light.power = 10.0f;
     //area_light.power = 0.0f;
     area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
     area_light.u = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
@@ -287,11 +287,21 @@ void Application::OnInit() {
     //grassland::LogInfo("rotated_dy: {}, {}, {}", rotated_dy.x, rotated_dy.y, rotated_dy.z);
     scene_->AddAreaLight(area_light); // exterior_fillLight
 
+    glm::vec3 windows_light_position = glm::vec3(3.784359, 0.932677, -3.497636);
+    glm::vec3 windows_light_dy = glm::vec3(0, 2.706061 - 0.932677, 0);
+    glm::vec3 windows_light_dz = glm::vec3(0, 0, 4.395454 - (-3.497636));
+    area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    area_light.position = windows_light_position;
+    area_light.v = windows_light_dy;
+    area_light.u = windows_light_dz;
+    area_light.power = 2000.0 * windows_light_dy.length() * windows_light_dz.length();
+    scene_->AddAreaLight(area_light); // windows dayLight_portal
+
     // Add sun light
     SunLight sun_light;
     sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
     // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
-    sun_light.power = 15.0f;
+    sun_light.power = 10.0f;
     sun_light.angle = 1.71874f;
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
