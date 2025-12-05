@@ -2,6 +2,11 @@
 struct CameraInfo {
 	float4x4 screen_to_camera;
 	float4x4 camera_to_world;
+
+    float focal_distance;
+    float aperture_radius;
+    float pad0;
+    float pad1;
 };
 
 struct Material {
@@ -167,6 +172,23 @@ struct RayPayload {
     bool is_shadow;
 };
 
+float2 sample_disk(inout uint seed, float radius)
+{
+    float2 a = float2(rnd(seed), rnd(seed)) * 2.0 - 1.0;
+    if (a.x == 0.0 && a.y == 0.0) return float2(0.0, 0.0);
+
+    float theta, r;
+    if (abs(a.x) > abs(a.y)) {
+        r = a.x;
+        theta = (PI / 4.0) * (a.y / a.x);
+    } else {
+        r = a.y;
+        theta = (PI / 2.0) - (PI / 4.0) * (a.x / a.y);
+    }
+    
+    return float2(radius * r * cos(theta), radius * r * sin(theta));
+}
+
 [shader("raygeneration")] void RayGenMain() {
 	uint2 pixel_coords = DispatchRaysIndex().xy;
     uint2 dims = DispatchRaysDimensions().xy;
@@ -179,16 +201,23 @@ struct RayPayload {
 	float2 uv = pixel_center / float2(dims);
 	uv.y = 1.0 - uv.y;
 	float2 d = uv * 2.0 - 1.0;
-	float4 origin = mul(camera_info.camera_to_world, float4(0, 0, 0, 1));
-	float4 target = mul(camera_info.screen_to_camera, float4(d, 1, 1));
-	float4 direction = mul(camera_info.camera_to_world, float4(target.xyz, 0));
+    float3 camera_pos_O = mul(camera_info.camera_to_world, float4(0, 0, 0, 1)).xyz;
+    float4 target_screen_cs = mul(camera_info.screen_to_camera, float4(d, 1, 1));
+    float3 direction_ws = mul(camera_info.camera_to_world, float4(target_screen_cs.xyz, 0)).xyz;
+    direction_ws = normalize(direction_ws);
+    float3 focal_point_Pf = camera_pos_O + direction_ws * camera_info.focal_distance;
+    float2 lens_sample_xy = sample_disk(seed, camera_info.aperture_radius);
+    float3 camera_x_axis = mul(camera_info.camera_to_world, float4(1, 0, 0, 0)).xyz;
+    float3 camera_y_axis = mul(camera_info.camera_to_world, float4(0, 1, 0, 0)).xyz;
+    float3 ray_origin_Pl = camera_pos_O + lens_sample_xy.x * camera_x_axis + lens_sample_xy.y * camera_y_axis;
+    float3 ray_direction_Dnew = normalize(focal_point_Pf - ray_origin_Pl);
 
 	float3 radiance = float3(0, 0, 0);
     float3 throughput = float3(1, 1, 1);
     
     RayDesc ray;
-	ray.Origin = origin.xyz;
-	ray.Direction = normalize(direction.xyz);
+	ray.Origin = ray_origin_Pl;
+	ray.Direction = ray_direction_Dnew;
 	ray.TMin = 0.001;
 	ray.TMax = 10000.0;
 
@@ -442,7 +471,7 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
       interp_uv.y = 1-interp_uv.y;
 
       float4 tex = material_images[mat.diffuse_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f);
-      tex.xyz = pow(tex.xyz, float3(2.2, 2.2, 2.2));
+    //   tex.xyz = pow(tex.xyz, float3(2.2, 2.2, 2.2));
       mat.diffuse = tex.xyz;
     }
     
