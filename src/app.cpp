@@ -406,6 +406,11 @@ void Application::OnInit() {
     camera_object.screen_to_camera = glm::inverse(
         glm::perspective(glm::radians(38.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
     camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
+    const float focal_length_m = 0.025f;
+    const float f_stop = 2.1f;
+
+    camera_object.aperture_radius = (focal_length_m / f_stop) / 2.0f;
+    camera_object.focal_distance =  4.3053756;
     camera_object_buffer_->UploadData(&camera_object, sizeof(CameraObject));
 
     core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
@@ -564,6 +569,11 @@ void Application::OnUpdate() {
         camera_object.screen_to_camera = glm::inverse(glm::perspective(
             glm::radians(38.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
         camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
+        const float focal_length_m = 0.025f;
+        const float f_stop = 2.1f;
+
+        camera_object.aperture_radius = (focal_length_m / f_stop) / 2.0f;
+        camera_object.focal_distance =  4.3053756;
         camera_object_buffer_->UploadData(&camera_object, sizeof(CameraObject));
 
         // Optional: Animate entities
