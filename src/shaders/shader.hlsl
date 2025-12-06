@@ -142,8 +142,8 @@ static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 10;
 static const float DIRECT_CLAMP = 11.0;
 static const float INDIRECT_CLAMP = 6.0;
-static const float SENSITIVITY = 1.5;
-static const float SATURATION = 1.0 / 2.0;
+static const float ISO_MULTIPLIER = 1.6;
+static const float GAMMA = 1.0 / 2.0;
 
 float3 clamp_direct(float3 color) {
     float norm = length(color);
@@ -272,8 +272,8 @@ float2 sample_disk(inout uint seed, float radius)
         radiance = float3(0, 0, 0);
     }
 
-    radiance = pow(radiance, SATURATION);
-    radiance = radiance * SENSITIVITY;
+    radiance = pow(radiance, GAMMA);
+    radiance = radiance * ISO_MULTIPLIER;
 
 	// Write to immediate output (for camera movement mode)
 	output[pixel_coords] = float4(radiance, 1);
