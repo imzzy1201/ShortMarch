@@ -399,7 +399,10 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         // Transmission
         if (transmission <= 0.0) return float3(0, 0, 0);
         
-        float3 H = -normalize(V * eta + L);
+        float3 h_vec = V * eta + L;
+        if (length(h_vec) < 1e-6) return float3(0, 0, 0);
+
+        float3 H = -normalize(h_vec);
         if (dot(H, N) < 0.0) H = -H;
 
         float NDF = DistributionGGX(N, H, roughness);
@@ -486,34 +489,41 @@ void SampleIndirect(
         next_origin = world_pos + N * 0.001;
     } else if (u_lobe < w_spec_refl + w_spec_trans) {
         // Sample Transmission
-        float2 u = float2(rnd(seed), rnd(seed));
-        float3 H = SampleGGX(u, N, roughness);
-        L_indirect = refract(-V, H, eta);
-        
-        if (length(L_indirect) > 0.0) {
-             float3 H_indirect = -normalize(V * eta + L_indirect);
-             if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
-             
-             float VdotH = abs(dot(V, H_indirect));
-             float NdotH = abs(dot(N, H_indirect));
-             float LdotH = abs(dot(L_indirect, H_indirect));
-             
-             float NDF = DistributionGGX(N, H_indirect, roughness);
-             
-             // PDF for transmission
-             float sqrtDenom = (eta * VdotH + LdotH);
-             float pdf_trans = NDF * NdotH * LdotH / (sqrtDenom * sqrtDenom);
-             
-             float pdf = (w_spec_trans / w_sum) * pdf_trans;
-             
-             if (pdf > 0.001) {
-                 float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
-                 throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
-             }
-             
-             next_origin = world_pos + L_indirect * 0.001;
+        if (abs(eta - 1.0) < 1e-4) {
+            L_indirect = -V;
+            float pdf = w_spec_trans / w_sum;
+            throughput_weight = (albedo * transmission) / pdf;
+            next_origin = world_pos + L_indirect * 0.001;
         } else {
-             throughput_weight = float3(0, 0, 0);
+            float2 u = float2(rnd(seed), rnd(seed));
+            float3 H = SampleGGX(u, N, roughness);
+            L_indirect = refract(-V, H, eta);
+            
+            if (length(L_indirect) > 0.0) {
+                 float3 H_indirect = -normalize(V * eta + L_indirect);
+                 if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
+                 
+                 float VdotH = abs(dot(V, H_indirect));
+                 float NdotH = abs(dot(N, H_indirect));
+                 float LdotH = abs(dot(L_indirect, H_indirect));
+                 
+                 float NDF = DistributionGGX(N, H_indirect, roughness);
+                 
+                 // PDF for transmission
+                 float sqrtDenom = (eta * VdotH + LdotH);
+                 float pdf_trans = NDF * NdotH * LdotH / (sqrtDenom * sqrtDenom);
+                 
+                 float pdf = (w_spec_trans / w_sum) * pdf_trans;
+                 
+                 if (pdf > 0.001) {
+                     float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                     throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
+                 }
+                 
+                 next_origin = world_pos + L_indirect * 0.001;
+            } else {
+                 throughput_weight = float3(0, 0, 0);
+            }
         }
     } else {
         // Sample Diffuse
