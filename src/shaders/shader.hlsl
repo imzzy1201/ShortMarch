@@ -139,7 +139,7 @@ float rnd(inout uint prev) {
 }
 
 static const float PI = 3.14159265359;
-static const int MAX_DEPTH = 10;
+static const int MAX_DEPTH = 8;
 static const float DIRECT_CLAMP = 11.0;
 static const float INDIRECT_CLAMP = 6.0;
 static const float SENSITIVITY = 1.5;
@@ -167,6 +167,7 @@ struct RayPayload {
     float3 throughput;
     float3 origin;
     float3 direction;
+    float transmittance;
     uint seed;
 	bool hit;
 	uint instance_id;
@@ -229,7 +230,7 @@ float2 sample_disk(inout uint seed, float radius)
 
     for (int depth = 0; depth < MAX_DEPTH; depth++) {
         payload.color = float3(0, 0, 0);
-        payload.throughput = float3(0, 0, 0);
+        payload.throughput = float3(1, 1, 1);
         payload.hit = false;
         payload.instance_id = 0;
         payload.is_shadow = false;
@@ -385,9 +386,10 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
     return diffuse + specular;
 }
 
-bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 direction, float maxDistance, inout uint seed) {
+float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 direction, float maxDistance, inout uint seed) {
     float3 currentOrigin = origin;
     float currentTMax = maxDistance;
+    float transmittance = 1.0;
     
     while(true) {
         RayDesc shadowRay;
@@ -401,6 +403,7 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         shadowPayload.hit = false; 
         shadowPayload.seed = seed;
         shadowPayload.instance_id = 0;
+        shadowPayload.transmittance = transmittance;
         
         TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
         
@@ -412,20 +415,21 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
             // Transparent hit, continue
             float3 prevOrigin = currentOrigin;
             currentOrigin = shadowPayload.origin;
+            transmittance = shadowPayload.transmittance;
             
             // Update TMax
             float step = length(currentOrigin - prevOrigin);
             currentTMax -= step;
             
-            if (currentTMax <= 0.001) return false; // Reached target
+            if (currentTMax <= 0.001) return transmittance; // Reached target
             
             seed = shadowPayload.seed; 
             continue;
         } else {
-            return false; // Missed everything
+            return transmittance; // Missed everything
         }
     }
-    return false;
+    return transmittance;
 }
 
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
@@ -479,18 +483,20 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
     
     // Transparency Check
     bool is_transparent = false;
-    if (mat.dissolve < 1.0) {
+    if (mat.dissolve < 1.0)
+    {
         if (rnd(payload.seed) >= mat.dissolve) {
             is_transparent = true;
         }
     }
 
     if (payload.is_shadow) {
-        if (is_transparent) {
+        if (true) {
             payload.hit = false;
             payload.instance_id = 1; // Signal continue
             payload.origin = world_pos + WorldRayDirection() * 0.001;
             payload.direction = WorldRayDirection();
+            payload.transmittance *= (1-mat.dissolve);
             return;
         } else {
             payload.hit = true; // Occluded
@@ -545,12 +551,12 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         float attenuation = 1.0 / (dist * dist);
         float3 radiance = light.color * light.power * attenuation / (4.0 * PI);
 
-        bool shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
+        float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
-        if (!shadow_hit) {
+        if (true) {
             float NdotL = max(dot(N, L), 0.0);
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
-            Lo += clamp_direct(bsdf * radiance * NdotL);
+            Lo += shadow_hit*clamp_direct(bsdf * radiance * NdotL);
         }
     }
 
@@ -571,12 +577,12 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
         float power_area = length(cross(light.u, light.v));
         float3 radiance = (light.color * light.power / power_area / PI) * NdotL_light * attenuation;
 
-        bool shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
+        float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
-        if (!shadow_hit) {
+        if (true) {
             float NdotL = max(dot(N, L), 0.0);
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
-            Lo += clamp_direct(bsdf * radiance * NdotL);
+            Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
         }
     }
 
@@ -601,12 +607,12 @@ bool TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 di
 
         float3 radiance = light.color * light.power;
         
-        bool shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, 10000.0, payload.seed);
+        float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, 10000.0, payload.seed);
         
-        if (!shadow_hit) {
+        if (true) {
             float NdotL = max(dot(N, L), 0.0);
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
-            Lo += clamp_direct(bsdf * radiance * NdotL);
+            Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
         }
     }
 

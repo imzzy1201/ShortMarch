@@ -297,6 +297,7 @@ void Application::OnInit() {
     area_light.v = windows_light_dy;
     area_light.u = windows_light_dz;
     area_light.power = 200.0 * windows_light_dy.length() * windows_light_dz.length();
+    //area_light.power = 0.0f;
     scene_->AddAreaLight(area_light); // windows dayLight_portal
 
     // Add sun light
@@ -304,6 +305,7 @@ void Application::OnInit() {
     sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
     // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
     sun_light.power = 5.0f;
+    //sun_light.power = 0.0f;
     sun_light.angle = 1.71874f;
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
