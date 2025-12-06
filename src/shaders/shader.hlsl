@@ -579,7 +579,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (true) {
-            float NdotL = max(dot(N, L), 0.0);
+            float NdotL = abs(dot(N, L));
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
             Lo += shadow_hit*clamp_direct(bsdf * radiance * NdotL);
         }
@@ -605,7 +605,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (true) {
-            float NdotL = max(dot(N, L), 0.0);
+            float NdotL = abs(dot(N, L));
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
             Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
         }
@@ -635,7 +635,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, 10000.0, payload.seed);
         
         if (true) {
-            float NdotL = max(dot(N, L), 0.0);
+            float NdotL = abs(dot(N, L));
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
             Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
         }
