@@ -270,7 +270,9 @@ float2 sample_disk(inout uint seed, float radius)
     }
 
     // Prevent NaN/Inf from corrupting the accumulation buffer
-    if (any(isnan(radiance)) || any(isinf(radiance))) {
+    if (any(isnan(radiance))) {
+        radiance = float3(0, 0, 0);
+    } else if(any(isinf(radiance))) {
         radiance = float3(0, 0, 0);
     }
 
@@ -325,10 +327,15 @@ float3 FresnelDielectric(float cosThetaI, float eta) {
     if (sinThetaT2 > 1.0) return float3(1.0, 1.0, 1.0); // TIR
 
     float cosThetaT = sqrt(1.0 - sinThetaT2);
-    
-    float r_parl = ((eta * cosThetaI) - cosThetaT) / ((eta * cosThetaI) + cosThetaT);
-    float r_perp = ((cosThetaI) - (eta * cosThetaT)) / ((cosThetaI) + (eta * cosThetaT));
-    
+
+    float denom_parl = (eta * cosThetaI) + cosThetaT;
+    float denom_perp = (cosThetaI) + (eta * cosThetaT);
+
+    if (abs(denom_parl) < 1e-5 || abs(denom_perp) < 1e-5) return float3(1.0, 1.0, 1.0);
+
+    float r_parl = ((eta * cosThetaI) - cosThetaT) / denom_parl;
+    float r_perp = ((cosThetaI) - (eta * cosThetaT)) / denom_perp;
+
     float f = (r_parl * r_parl + r_perp * r_perp) / 2.0;
     return float3(f, f, f);
 }
