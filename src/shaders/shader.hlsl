@@ -114,6 +114,7 @@ StructuredBuffer<float2> texcoords : register(t0, space16);
 StructuredBuffer<float3> tangents : register(t0, space17);
 Texture2D<float4> material_images[] : register(t0, space18);
 SamplerState material_sampler : register(s0, space19);
+Texture2D<float4> g_HDRISkybox : register(t0, space20);
 // Random Number Generator
 uint tea(uint val0, uint val1) {
     uint v0 = val0;
@@ -296,10 +297,21 @@ float2 sample_disk(inout uint seed, float radius)
         return;
     }
     
-	// Sky gradient
-	float t = 0.5 * (normalize(WorldRayDirection()).y + 1.0);
-	payload.color = lerp(float3(1.0, 1.0, 1.0), float3(0.5, 0.7, 1.0), t);
-	payload.hit = false;
+    float3 W = normalize(WorldRayDirection());
+    
+    float phi = atan2(W.x, W.z); 
+    float theta = acos(W.y);
+    
+    float u = phi / (2.0 * 3.14159265359) + 0.5;
+    float v = theta / 3.14159265359;
+    
+    float2 uv = float2(u, v);
+    
+    float3 sky_color = g_HDRISkybox.SampleLevel(material_sampler, uv, 0).rgb;
+    
+    payload.color = sky_color;
+    
+    payload.hit = false;
     payload.throughput = float3(0, 0, 0);
 }
 

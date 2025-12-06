@@ -75,6 +75,10 @@ class Scene {
     // Update TLAS instances (e.g., for animation)
     void UpdateInstances();
 
+    void LoadEnvironmentMap(const std::string& filename);
+
+    grassland::graphics::Image *GetEnvironmentMap() const {return environment_map_.get();}
+
     // Get the TLAS for rendering
     grassland::graphics::AccelerationStructure *GetTLAS() const { return tlas_.get(); }
 
@@ -121,4 +125,5 @@ class Scene {
     std::unique_ptr<grassland::graphics::Buffer> sun_lights_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> scene_info_buffer_;
     std::vector<std::unique_ptr<grassland::graphics::Image>> material_images_;
+    std::unique_ptr<grassland::graphics::Image> environment_map_;
 };

@@ -55,6 +55,24 @@ void Scene::AddSunLight(const SunLight &light) {
     grassland::LogInfo("Added sun light to scene (total: {})", sun_lights_.size());
 }
 
+void Scene::LoadEnvironmentMap(const std::string& filename) {
+    std::string full_path = grassland::FindAssetFile(filename);
+    if (full_path.empty()) {
+        grassland::LogError("Failed to find environment map file: {}", filename);
+        return;
+    }
+
+    std::unique_ptr<grassland::graphics::Image> img;
+    int res = grassland::graphics::LoadImageFromFile(core_, full_path, &img); 
+
+    if (res == 0 && img) {
+        environment_map_ = std::move(img);
+        grassland::LogInfo("Loaded environment map: {}", full_path);
+    } else {
+        grassland::LogError("Failed to load environment map: {}", full_path);
+    }
+}
+
 void Scene::BuildAccelerationStructures() {
     if (entities_.empty()) {
         grassland::LogWarning("No entities to build acceleration structures");

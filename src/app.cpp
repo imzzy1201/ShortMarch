@@ -227,6 +227,8 @@ void Application::OnInit() {
         }
     }
 
+    scene_->LoadEnvironmentMap("meshes/sunny_rose_garden_4k.hdr");
+
     float PI = 3.14159265359f;
 
     // Add point lights
@@ -451,7 +453,8 @@ void Application::OnInit() {
     auto material_images = scene_->GetMaterialImages();
     int image_descriptor_count = material_images.empty() ? 1 : static_cast<int>(material_images.size());
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, image_descriptor_count); // space18
-    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_SAMPLER, 1); 
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_SAMPLER, 1); //space19
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, 1); // space20
     program_->Finalize();
 
     core_->CreateSampler(grassland::graphics::SamplerInfo(grassland::graphics::FILTER_MODE_LINEAR), &material_sampler_);
@@ -948,6 +951,8 @@ void Application::OnRender() {
     if (material_sampler_) {
         command_context->CmdBindResources(19, {material_sampler_.get()}, grassland::graphics::BIND_POINT_RAYTRACING);
     }
+
+    command_context->CmdBindResources(20, {scene_->GetEnvironmentMap()}, grassland::graphics::BIND_POINT_RAYTRACING);
 
     command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
 
