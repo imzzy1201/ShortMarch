@@ -419,9 +419,10 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         float LdotH = max(dot(-L, H), 0.0);
         
         float3 F = FresnelDielectric(VdotH, eta);
+        if (F.x >= 1.0) return float3(0, 0, 0); // TIR or grazing angle, no transmission
         
         float sqrtDenom = (eta * VdotH + LdotH);
-        float common = (NDF * G * VdotH * LdotH) / (NdotV * abs(NdotL) * sqrtDenom * sqrtDenom);
+        float common = (NDF * G * VdotH * LdotH) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
         
         return albedo * (1.0 - F) * common * (1.0 - metallic) * transmission;
     } else {
@@ -507,24 +508,29 @@ void SampleIndirect(
             L_indirect = refract(-V, H, eta);
             
             if (length(L_indirect) > 0.0) {
-                float3 H_indirect = -normalize(V * eta + L_indirect);
-                if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
-                
-                float VdotH = abs(dot(V, H_indirect));
-                float NdotH = abs(dot(N, H_indirect));
-                float LdotH = abs(dot(L_indirect, H_indirect));
-                
-                float NDF = DistributionGGX(N, H_indirect, roughness);
-                
-                // PDF for transmission
-                float sqrtDenom = (eta * VdotH + LdotH);
-                float pdf_trans = NDF * NdotH * LdotH / (sqrtDenom * sqrtDenom);
-                
-                float pdf = (w_spec_trans / w_sum) * pdf_trans;
-                
-                if (pdf > 0.001) {
-                    float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
-                    throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
+                float3 h_vec = V * eta + L_indirect;
+                if (length(h_vec) < 1e-6) {
+                    throughput_weight = float3(0, 0, 0);
+                } else {
+                    float3 H_indirect = -normalize(h_vec);
+                    if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
+                    
+                    float VdotH = abs(dot(V, H_indirect));
+                    float NdotH = abs(dot(N, H_indirect));
+                    float LdotH = abs(dot(L_indirect, H_indirect));
+                    
+                    float NDF = DistributionGGX(N, H_indirect, roughness);
+                    
+                    // PDF for transmission
+                    float sqrtDenom = (eta * VdotH + LdotH);
+                    float pdf_trans = NDF * NdotH * LdotH / max(sqrtDenom * sqrtDenom, 1e-5);
+                    
+                    float pdf = (w_spec_trans / w_sum) * pdf_trans;
+                    
+                    if (pdf > 0.001) {
+                        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                        throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
+                    }
                 }
                 
                 next_origin = world_pos + L_indirect * 0.001;
