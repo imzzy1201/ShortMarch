@@ -507,29 +507,29 @@ void SampleIndirect(
             L_indirect = refract(-V, H, eta);
             
             if (length(L_indirect) > 0.0) {
-                 float3 H_indirect = -normalize(V * eta + L_indirect);
-                 if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
-                 
-                 float VdotH = abs(dot(V, H_indirect));
-                 float NdotH = abs(dot(N, H_indirect));
-                 float LdotH = abs(dot(L_indirect, H_indirect));
-                 
-                 float NDF = DistributionGGX(N, H_indirect, roughness);
-                 
-                 // PDF for transmission
-                 float sqrtDenom = (eta * VdotH + LdotH);
-                 float pdf_trans = NDF * NdotH * LdotH / (sqrtDenom * sqrtDenom);
-                 
-                 float pdf = (w_spec_trans / w_sum) * pdf_trans;
-                 
-                 if (pdf > 0.001) {
-                     float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
-                     throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
-                 }
-                 
-                 next_origin = world_pos + L_indirect * 0.001;
+                float3 H_indirect = -normalize(V * eta + L_indirect);
+                if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
+                
+                float VdotH = abs(dot(V, H_indirect));
+                float NdotH = abs(dot(N, H_indirect));
+                float LdotH = abs(dot(L_indirect, H_indirect));
+                
+                float NDF = DistributionGGX(N, H_indirect, roughness);
+                
+                // PDF for transmission
+                float sqrtDenom = (eta * VdotH + LdotH);
+                float pdf_trans = NDF * NdotH * LdotH / (sqrtDenom * sqrtDenom);
+                
+                float pdf = (w_spec_trans / w_sum) * pdf_trans;
+                
+                if (pdf > 0.001) {
+                    float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                    throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
+                }
+                
+                next_origin = world_pos + L_indirect * 0.001;
             } else {
-                 throughput_weight = float3(0, 0, 0);
+                throughput_weight = float3(0, 0, 0);
             }
         }
     } else {
