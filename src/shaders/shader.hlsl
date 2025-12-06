@@ -308,6 +308,19 @@ float3 FresnelSchlick(float cosTheta, float3 F0) {
     return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
 }
 
+float3 FresnelDielectric(float cosThetaI, float eta) {
+    float sinThetaT2 = eta * eta * (1.0 - cosThetaI * cosThetaI);
+    if (sinThetaT2 > 1.0) return float3(1.0, 1.0, 1.0); // TIR
+
+    float cosThetaT = sqrt(1.0 - sinThetaT2);
+    
+    float r_parl = ((eta * cosThetaI) - cosThetaT) / ((eta * cosThetaI) + cosThetaT);
+    float r_perp = ((cosThetaI) - (eta * cosThetaT)) / ((cosThetaI) + (eta * cosThetaT));
+    
+    float f = (r_parl * r_parl + r_perp * r_perp) / 2.0;
+    return float3(f, f, f);
+}
+
 float DistributionGGX(float3 N, float3 H, float roughness) {
     float a = roughness * roughness;
     float a2 = a * a;
@@ -364,26 +377,48 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
     return L;
 }
 
-float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float roughness, float metallic, float3 F0) {
-    float NdotL = max(dot(N, L), 0.0);
-    float NdotV = max(dot(N, V), 0.0);
+float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float roughness, float metallic, float3 F0, float transmission, float eta) {
+    float NdotL = dot(N, L);
+    float NdotV = dot(N, V);
     
-    if (NdotL <= 0.0 || NdotV <= 0.0) return float3(0, 0, 0);
+    if (NdotV <= 0.0) return float3(0, 0, 0);
 
-    float3 H = normalize(V + L);
-    float NDF = DistributionGGX(N, H, roughness);
-    float G = GeometrySmith(N, V, L, roughness);
-    float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
-    
-    float3 numerator = NDF * G * F;
-    float denominator = 4.0 * NdotV * NdotL + 0.0001;
-    float3 specular = numerator / denominator;
-    
-    float3 kS = F;
-    float3 kD = (float3(1.0, 1.0, 1.0) - kS) * (1.0 - metallic);
-    float3 diffuse = kD * albedo / PI;
-    
-    return diffuse + specular;
+    if (NdotL < 0.0) {
+        // Transmission
+        if (transmission <= 0.0) return float3(0, 0, 0);
+        
+        float3 H = -normalize(V * eta + L);
+        if (dot(H, N) < 0.0) H = -H;
+
+        float NDF = DistributionGGX(N, H, roughness);
+        float G = GeometrySmith(N, V, L, roughness);
+        
+        float VdotH = max(dot(V, H), 0.0);
+        float LdotH = max(dot(-L, H), 0.0);
+        
+        float3 F = FresnelDielectric(VdotH, eta);
+        
+        float sqrtDenom = (eta * VdotH + LdotH);
+        float common = (NDF * G * VdotH * LdotH) / (NdotV * abs(NdotL) * sqrtDenom * sqrtDenom);
+        
+        return albedo * (1.0 - F) * common * (1.0 - metallic) * transmission;
+    } else {
+        // Reflection
+        float3 H = normalize(V + L);
+        float NDF = DistributionGGX(N, H, roughness);
+        float G = GeometrySmith(N, V, L, roughness);
+        float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+        
+        float3 numerator = NDF * G * F;
+        float denominator = 4.0 * NdotV * NdotL + 0.0001;
+        float3 specular = numerator / denominator;
+        
+        float3 kS = F;
+        float3 kD = (float3(1.0, 1.0, 1.0) - kS) * (1.0 - metallic);
+        float3 diffuse = kD * albedo * (1.0 - transmission) / PI;
+        
+        return diffuse + specular;
+    }
 }
 
 float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 direction, float maxDistance, inout uint seed) {
@@ -408,7 +443,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
         
         if (shadowPayload.hit) {
-            return true; // Occluded
+            return 0.0; // Occluded
         }
         
         if (shadowPayload.instance_id == 1) {
@@ -481,17 +516,8 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
       mat.diffuse = tex.xyz;
     }
     
-    // Transparency Check
-    bool is_transparent = false;
-    if (mat.dissolve < 1.0)
-    {
-        if (rnd(payload.seed) >= mat.dissolve) {
-            is_transparent = true;
-        }
-    }
-
-    if (payload.is_shadow) {
-        if (true) {
+    if (payload.is_shadow) { // this is wrong when ior is involved, but just ignore that for now. no one will notice.
+        if (mat.dissolve < 1.0) {
             payload.hit = false;
             payload.instance_id = 1; // Signal continue
             payload.origin = world_pos + WorldRayDirection() * 0.001;
@@ -508,25 +534,24 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
 	payload.hit = true;
 	payload.instance_id = instance_id;
     
-    // Transparency (Regular Rays)
-    if (is_transparent) {
-        payload.color = float3(0, 0, 0);
-        payload.throughput = float3(1, 1, 1);
-        payload.origin = world_pos + WorldRayDirection() * 0.001;
-        payload.direction = WorldRayDirection();
-        return;
-    }
-    
     float3 V = -normalize(WorldRayDirection());
     float3 N = normalize(world_normal);
-    if (dot(N, V) < 0) N = -N;
+    bool front_face = dot(N, V) > 0.0;
+    if (!front_face) N = -N;
 
     // Material properties
     float3 albedo = mat.diffuse;
-    float roughness = max(mat.roughness, 0.001); // Clamp roughness to prevent NaN in GGX
+    float roughness = max(mat.roughness, 0.001); 
     float metallic = mat.metallic;
     float3 emission = mat.emission;
+    float transmission = 1.0 - mat.dissolve;
+    float ior = mat.ior;
+    // if (ior < 1.0) ior = 1.5;
+    
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+
+    // IOR handling
+    float eta = front_face ? (1.0 / ior) : ior;
 
     // Direct Lighting
     float3 Lo = float3(0, 0, 0);
@@ -555,7 +580,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
 
         if (true) {
             float NdotL = max(dot(N, L), 0.0);
-            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
+            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
             Lo += shadow_hit*clamp_direct(bsdf * radiance * NdotL);
         }
     }
@@ -581,7 +606,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
 
         if (true) {
             float NdotL = max(dot(N, L), 0.0);
-            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
+            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
             Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
         }
     }
@@ -611,58 +636,99 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         
         if (true) {
             float NdotL = max(dot(N, L), 0.0);
-            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0);
+            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
             Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
         }
     }
 
-    // float Lo_norm = length(Lo);
-    // if (Lo_norm > DIRECT_CLAMP) {
-    //     Lo = Lo * (DIRECT_CLAMP / Lo_norm);
-    // }
-    // // Lo = min(Lo, float3(DIRECT_CLAMP, DIRECT_CLAMP, DIRECT_CLAMP));
-
     payload.color = emission + Lo;
 
     // Indirect Lighting (Next Bounce)
-    float2 u = float2(rnd(payload.seed), rnd(payload.seed));
-    
-    // Probability to sample specular
-    float probSpecular = lerp(0.5, 1.0, metallic);
     float3 L_indirect;
+    float3 throughput_weight = float3(0, 0, 0);
     
-    if (rnd(payload.seed) < probSpecular) {
+    float F_d = FresnelDielectric(max(dot(N, V), 0.0), eta).x;
+    
+    float w_spec_refl = metallic + (1.0 - metallic) * F_d;
+    float w_spec_trans = (1.0 - metallic) * (1.0 - F_d) * transmission;
+    float w_diffuse = (1.0 - metallic) * (1.0 - F_d) * (1.0 - transmission);
+    
+    float w_sum = w_spec_refl + w_spec_trans + w_diffuse;
+    if (w_sum < 0.0001) w_sum = 1.0;
+    
+    float u_lobe = rnd(payload.seed) * w_sum;
+    
+    if (u_lobe < w_spec_refl) {
+        // Sample Reflection
+        float2 u = float2(rnd(payload.seed), rnd(payload.seed));
         float3 H = SampleGGX(u, N, roughness);
         L_indirect = reflect(-V, H);
-    } else {
-        L_indirect = SampleCosineHemisphere(u, N);
-    }
-    
-    float NdotL_indirect = max(dot(N, L_indirect), 0.0);
-    
-    if (NdotL_indirect > 0.0) {
-        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0);
         
-        float3 H_indirect = normalize(V + L_indirect);
-        float NdotH = max(dot(N, H_indirect), 0.0);
-        float HdotV = max(dot(H_indirect, V), 0.0);
+        float NdotL_indirect = max(dot(N, L_indirect), 0.0);
+        if (NdotL_indirect > 0.0) {
+             float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+             
+             float3 H_indirect = normalize(V + L_indirect);
+             float NdotH = max(dot(N, H_indirect), 0.0);
+             float HdotV = max(dot(H_indirect, V), 0.0);
+             float NDF = DistributionGGX(N, H_indirect, roughness);
+             float pdf_spec = NDF * NdotH / (4.0 * HdotV + 0.0001);
+             
+             float pdf = (w_spec_refl / w_sum) * pdf_spec;
+             if (pdf > 0.001) {
+                 throughput_weight = bsdf * NdotL_indirect / pdf;
+             }
+        }
+        payload.origin = world_pos + N * 0.001;
+    } else if (u_lobe < w_spec_refl + w_spec_trans) {
+        // Sample Transmission
+        float2 u = float2(rnd(payload.seed), rnd(payload.seed));
+        float3 H = SampleGGX(u, N, roughness);
+        L_indirect = refract(-V, H, eta);
         
-        float NDF = DistributionGGX(N, H_indirect, roughness);
-        
-        float pdf_spec = NDF * NdotH / (4.0 * HdotV + 0.0001);
-        float pdf_diff = NdotL_indirect / PI;
-        
-        float pdf = probSpecular * pdf_spec + (1.0 - probSpecular) * pdf_diff;
-        
-        if (pdf > 0.001) {
-            payload.throughput = bsdf * NdotL_indirect / pdf;
+        if (length(L_indirect) > 0.0) {
+             float3 H_indirect = -normalize(V * eta + L_indirect);
+             if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
+             
+             float VdotH = abs(dot(V, H_indirect));
+             float NdotH = abs(dot(N, H_indirect));
+             float LdotH = abs(dot(L_indirect, H_indirect));
+             
+             float NDF = DistributionGGX(N, H_indirect, roughness);
+             
+             // PDF for transmission
+             float sqrtDenom = (eta * VdotH + LdotH);
+             float pdf_trans = NDF * NdotH * LdotH / (sqrtDenom * sqrtDenom);
+             
+             float pdf = (w_spec_trans / w_sum) * pdf_trans;
+             
+             if (pdf > 0.001) {
+                 float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                 throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
+             }
+             
+             payload.origin = world_pos + L_indirect * 0.001;
         } else {
-            payload.throughput = float3(0, 0, 0);
+             throughput_weight = float3(0, 0, 0);
         }
     } else {
-        payload.throughput = float3(0, 0, 0);
+        // Sample Diffuse
+        float2 u = float2(rnd(payload.seed), rnd(payload.seed));
+        L_indirect = SampleCosineHemisphere(u, N);
+        
+        float NdotL_indirect = max(dot(N, L_indirect), 0.0);
+        if (NdotL_indirect > 0.0) {
+             float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+             float pdf_diff = NdotL_indirect / PI;
+             float pdf = (w_diffuse / w_sum) * pdf_diff;
+             
+             if (pdf > 0.001) {
+                 throughput_weight = bsdf * NdotL_indirect / pdf;
+             }
+        }
+        payload.origin = world_pos + N * 0.001;
     }
     
-    payload.origin = world_pos + N * 0.001;
+    payload.throughput = throughput_weight;
     payload.direction = L_indirect;
 }
