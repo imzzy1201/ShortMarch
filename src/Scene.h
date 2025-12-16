@@ -45,7 +45,7 @@ struct SceneInfo {
     uint32_t num_point_lights;
     uint32_t num_area_lights;
     uint32_t num_sun_lights;
-    uint32_t _pad;
+    uint32_t has_hdri_skybox;
 };
 
 // Scene manages a collection of entities and builds the TLAS
@@ -103,6 +103,7 @@ class Scene {
     std::vector<grassland::graphics::Image *> GetMaterialImages() const;
 
   private:
+    bool HasEnvironmentMap;
     void UpdateMaterialsBuffer();
     void UpdateGlobalBuffers();
     void UpdateLightsBuffer();

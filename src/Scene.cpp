@@ -1,6 +1,6 @@
 #include "Scene.h"
 
-Scene::Scene(grassland::graphics::Core *core) : core_(core) {}
+Scene::Scene(grassland::graphics::Core *core) : core_(core) {HasEnvironmentMap = false;}
 
 Scene::~Scene() { Clear(); }
 
@@ -67,6 +67,7 @@ void Scene::LoadEnvironmentMap(const std::string& filename) {
 
     if (res == 0 && img) {
         environment_map_ = std::move(img);
+        HasEnvironmentMap = true;
         grassland::LogInfo("Loaded environment map: {}", full_path);
     } else {
         grassland::LogError("Failed to load environment map: {}", full_path);
@@ -428,7 +429,15 @@ void Scene::UpdateLightsBuffer() {
     info.num_point_lights = static_cast<uint32_t>(point_lights_.size());
     info.num_area_lights = static_cast<uint32_t>(area_lights_.size());
     info.num_sun_lights = static_cast<uint32_t>(sun_lights_.size());
-    info._pad = 0;
+    info.has_hdri_skybox = HasEnvironmentMap?1u:0u;
+
+    if(!info.has_hdri_skybox)
+    {
+        core_->CreateImage(1, 1, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &environment_map_);
+        // Upload a single white pixel (RGBA 8-bit)
+        uint8_t white_pixel[4] = { 255u, 255u, 255u, 255u };
+        environment_map_->UploadData(white_pixel);
+    }
 
     if (!scene_info_buffer_) {
         core_->CreateBuffer(sizeof(SceneInfo), grassland::graphics::BUFFER_TYPE_DYNAMIC, &scene_info_buffer_);
