@@ -212,6 +212,10 @@ void Scene::UpdateMaterialsBuffer() {
         int sheen_tex_id;      // [NOT USED]
         int emissive_tex_id;   // [NOT USED]
         int normal_tex_id;     // [NOT USED]
+
+        glm::vec3 vol_sigma_a = glm::vec3(0.0f);
+        glm::vec3 vol_sigma_s = glm::vec3(0.0f);
+        float vol_g = 0.0f;
     };
 
 
@@ -261,6 +265,10 @@ void Scene::UpdateMaterialsBuffer() {
         gm.sheen_tex_id = m.sheen_tex_id;      // [NOT USED]
         gm.emissive_tex_id = m.emissive_tex_id;   // [NOT USED]
         gm.normal_tex_id = m.normal_tex_id;          // [NOT USED]
+
+        gm.vol_sigma_a = m.vol_sigma_a;
+        gm.vol_sigma_s = m.vol_sigma_s;
+        gm.vol_g = m.vol_g;
 
         if (!m.diffuse_color_texname.empty()) {
             std::string full_path = grassland::FindAssetFile(m.diffuse_color_texname);

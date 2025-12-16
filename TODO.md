@@ -25,6 +25,6 @@
   - [ ] Chromatic dispersion (2pts)
 - [ ] Lighting: Options include:
   - [x] Point light and area light (**basic**)
-  - [ ] Environment lighting with HDR, such as skybox (2pts)
-- [ ] Anti-aliasing: Implement an anti-aliasing algorithm (**basic**)
+  - [x] Environment lighting with HDR, such as skybox (2pts)
+- [x] Anti-aliasing: Implement an anti-aliasing algorithm (**basic**)
 - [ ] Simulation-based content creation: Up to 2pts

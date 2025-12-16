@@ -44,6 +44,10 @@ struct Material {
 
     std::string diffuse_color_texname;
 
+    glm::vec3 vol_sigma_a = glm::vec3(0.0f);
+    glm::vec3 vol_sigma_s = glm::vec3(0.0f);
+    float vol_g = 0.0f;
+
     // tinyobj::material_t tinyobj_mat; // TinyObjLoader material
 
     Material() : base_color(0.8f, 0.8f, 0.8f), roughness(0.5f), metallic(0.0f) {}
@@ -80,6 +84,14 @@ struct Material {
             if (it != mat.unknown_parameter.end()) {
                 diffuse_color_texname = prefix_path +it->second;
             }
+        }
+        float r = std::max(0.001f, mat.transmittance[0]);
+        float g = std::max(0.001f, mat.transmittance[1]);
+        float b = std::max(0.001f, mat.transmittance[2]);
+        
+        if (mat.dissolve < 1.0f) {
+            vol_sigma_a = -glm::log(glm::vec3(r, g, b));
+            vol_sigma_s = glm::vec3(0.0f);
         }
     }
 };

@@ -45,6 +45,10 @@ struct Material {
     int sheen_tex_id;      // [NOT USED]
     int emissive_tex_id;   // [NOT USED]
     int normal_tex_id;     // [NOT USED]
+
+    float3 vol_sigma_a; // volume absorption coefficient
+    float3 vol_sigma_s; // volume scattering coefficient
+    float vol_g;
 };
 
 struct HoverInfo {
@@ -143,7 +147,8 @@ static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 8;
 static const float DIRECT_CLAMP = 11.0;
 static const float INDIRECT_CLAMP = 6.0;
-static const float ISO_MULTIPLIER = 1.6;
+//static const float ISO_MULTIPLIER = 1.6;
+static const float ISO_MULTIPLIER = 1.0;
 static const float GAMMA = 1.0 / 2.0;
 
 float3 clamp_direct(float3 color) {
@@ -168,11 +173,15 @@ struct RayPayload {
     float3 throughput;
     float3 origin;
     float3 direction;
-    float transmittance;
+    float3 transmittance;
     uint seed;
 	bool hit;
 	uint instance_id;
     bool is_shadow;
+
+    bool is_inside;
+    float3 current_sigma_a;
+    float3 current_sigma_s;
 };
 
 float2 sample_disk(inout uint seed, float radius)
@@ -500,56 +509,46 @@ void SampleIndirect(
         }
         next_origin = world_pos + N * 0.001;
     } else if (u_lobe < w_spec_refl + w_spec_trans) {
-        float NdotV = dot(N, V);
-        bool is_entering = NdotV > 0.0;
-
-        float n1 = is_entering ? 1.0 : eta;
-        float n2 = is_entering ? eta : 1.0;
-        float eta_ratio = n1 / n2;
-        float3 N_orient = is_entering ? N : -N;
-
+        // Sample Transmission
         if (abs(eta - 1.0) < 1e-4) {
             L_indirect = -V;
             float pdf = w_spec_trans / w_sum;
-            throughput_weight = (albedo * transmission) / max(pdf, 1e-6); 
+            throughput_weight = (albedo * transmission) / pdf;
             next_origin = world_pos + L_indirect * 0.001;
         } else {
             float2 u = float2(rnd(seed), rnd(seed));
-            float3 H = SampleGGX(u, N_orient, roughness);
-            
-            L_indirect = refract(-V, H, eta_ratio);
+            float3 H = SampleGGX(u, N, roughness);
+            L_indirect = refract(-V, H, eta);
             
             if (length(L_indirect) > 0.0) {
-                float3 h_vec = -(n1 * V + n2 * L_indirect);
-                float3 H_indirect = normalize(h_vec);
-                
-                if (dot(H_indirect, N_orient) < 0.0) H_indirect = -H_indirect;
-                
-                float VdotH = abs(dot(V, H_indirect));
-                float NdotH = abs(dot(N, H_indirect));
-                float LdotH = abs(dot(L_indirect, H_indirect));
-                float NdotL = abs(dot(N, L_indirect));
-                
-                float NDF = DistributionGGX(N_orient, H_indirect, roughness);
-                
-                float denom = (n1 * VdotH + n2 * LdotH);
-                float jacobian = (n2 * n2 * LdotH) / max(denom * denom, 1e-5);
-                float pdf_trans = NDF * NdotH * jacobian;
-                
-                float pdf = (w_spec_trans / w_sum) * pdf_trans;
-                
-                if (pdf > 1e-6) {
-                    float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
-                    
-                    throughput_weight = bsdf * NdotL / pdf;
-                } else {
+                float3 h_vec = V * eta + L_indirect;
+                if (length(h_vec) < 1e-6) {
                     throughput_weight = float3(0, 0, 0);
+                } else {
+                    float3 H_indirect = -normalize(h_vec);
+                    if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
+                    
+                    float VdotH = abs(dot(V, H_indirect));
+                    float NdotH = abs(dot(N, H_indirect));
+                    float LdotH = abs(dot(L_indirect, H_indirect));
+                    
+                    float NDF = DistributionGGX(N, H_indirect, roughness);
+                    
+                    // PDF for transmission
+                    float sqrtDenom = (eta * VdotH + LdotH);
+                    float pdf_trans = NDF * NdotH * LdotH / max(sqrtDenom * sqrtDenom, 1e-5);
+                    
+                    float pdf = (w_spec_trans / w_sum) * pdf_trans;
+                    
+                    if (pdf > 0.001) {
+                        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                        throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
+                    }
                 }
                 
                 next_origin = world_pos + L_indirect * 0.001;
             } else {
                 throughput_weight = float3(0, 0, 0);
-                next_origin = world_pos;
             }
         }
     } else {
@@ -571,10 +570,13 @@ void SampleIndirect(
     }
 }
 
-float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 direction, float maxDistance, inout uint seed) {
+float3 TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 direction, float maxDistance, inout uint seed) {
     float3 currentOrigin = origin;
     float currentTMax = maxDistance;
-    float transmittance = 1.0;
+    float3 transmittance = float3(1.0, 1.0, 1.0);
+    bool is_inside = false;
+    float3 current_sigma_a = float3(0.0, 0.0, 0.0);
+    float3 current_sigma_s = float3(0.0, 0.0, 0.0);
     
     while(true) {
         RayDesc shadowRay;
@@ -588,27 +590,37 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         shadowPayload.hit = false; 
         shadowPayload.seed = seed;
         shadowPayload.instance_id = 0;
-        shadowPayload.transmittance = transmittance;
+        shadowPayload.transmittance = float3(1.0, 1.0, 1.0);
+        shadowPayload.is_inside = is_inside;
+        shadowPayload.current_sigma_a = current_sigma_a;
+        shadowPayload.current_sigma_s = current_sigma_s;
         
         TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, shadowRay, shadowPayload);
         
         if (shadowPayload.hit) {
-            return 0.0; // Occluded
+            return float3(0.0, 0.0, 0.0); // Occluded
         }
         
         if (shadowPayload.instance_id == 1) {
-            // Transparent hit, continue
             float3 prevOrigin = currentOrigin;
             currentOrigin = shadowPayload.origin;
-            transmittance = shadowPayload.transmittance;
-            
-            // Update TMax
+
+            transmittance *= shadowPayload.transmittance;
+
             float step = length(currentOrigin - prevOrigin);
             currentTMax -= step;
-            
-            if (currentTMax <= 0.001) return transmittance; // Reached target
-            
-            seed = shadowPayload.seed; 
+
+            // Update volumetric medium state from the hit
+            is_inside = shadowPayload.is_inside;
+            current_sigma_a = shadowPayload.current_sigma_a;
+            current_sigma_s = shadowPayload.current_sigma_s;
+
+            if (currentTMax <= 0.001) {
+                seed = shadowPayload.seed;
+                return transmittance;
+            }
+
+            seed = shadowPayload.seed;
             continue;
         } else {
             return transmittance; // Missed everything
@@ -623,6 +635,12 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
 	
 	// Load material
 	Material mat = materials[instance_id];
+
+    if (payload.is_inside) {
+        float dist = RayTCurrent();
+        float3 sigma_t = payload.current_sigma_a + payload.current_sigma_s;
+        payload.throughput *= exp(-sigma_t * dist);
+    }
     
     // Fetch Geometry
     InstanceInfo info = instance_infos[instance_id];
@@ -669,10 +687,52 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
     if (payload.is_shadow) { // this is wrong when ior is involved, but just ignore that for now. no one will notice.
         if (mat.dissolve < 1.0) {
             payload.hit = false;
-            payload.instance_id = 1; // Signal continue
+            payload.instance_id = 1; 
+            
+            if (payload.is_inside) {
+                float dist = RayTCurrent();
+                float3 sigma_t = payload.current_sigma_a + payload.current_sigma_s;
+                payload.transmittance = exp(-sigma_t * dist);
+            } else {
+                payload.transmittance = float3(1.0, 1.0, 1.0);
+            }
+            float dist = RayTCurrent();
+            float3 sigma_t = mat.vol_sigma_a + mat.vol_sigma_s;
+            float3 segment_transmittance = exp(-sigma_t * dist);
+
+            payload.transmittance *= (1.0 - mat.dissolve) * segment_transmittance;
+
+            float3 V = -normalize(WorldRayDirection());
+            float3 N = float3(0, 0, 0);
+            // Re-compute normal properly for accurate front-face detection
+            InstanceInfo info = instance_infos[InstanceID()];
+            uint prim_idx = PrimitiveIndex();
+            uint3 idx = uint3(
+                indices[info.index_offset + prim_idx * 3 + 0],
+                indices[info.index_offset + prim_idx * 3 + 1],
+                indices[info.index_offset + prim_idx * 3 + 2]
+            );
+            float3 n0 = normals[info.normal_offset + idx.x];
+            float3 n1 = normals[info.normal_offset + idx.y];
+            float3 n2 = normals[info.normal_offset + idx.z];
+            float3 bary = float3(1.0 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+            N = normalize(mul(ObjectToWorld3x4(), float4(n0 * bary.x + n1 * bary.y + n2 * bary.z, 0)).xyz);
+            
+            bool front_face = dot(N, V) > 0.0;
+            
+            if (front_face) {
+                // Entering the material
+                payload.is_inside = true;
+                payload.current_sigma_a = mat.vol_sigma_a;
+                payload.current_sigma_s = mat.vol_sigma_s;
+            } else {
+                // Exiting the material
+                payload.is_inside = false;
+                payload.current_sigma_a = float3(0.0, 0.0, 0.0);
+                payload.current_sigma_s = float3(0.0, 0.0, 0.0);
+            }
+
             payload.origin = world_pos + WorldRayDirection() * 0.001;
-            payload.direction = WorldRayDirection();
-            payload.transmittance *= (1 - mat.dissolve);
             return;
         } else {
             payload.hit = true; // Occluded
@@ -726,12 +786,12 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         float attenuation = 1.0 / (dist * dist);
         float3 radiance = light.color * light.power * attenuation / (4.0 * PI);
 
-        float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
+        float3 shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (true) {
             float NdotL = abs(dot(N, L));
             float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
-            Lo += shadow_hit*clamp_direct(bsdf * radiance * NdotL);
+            Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
         }
     }
 
@@ -752,7 +812,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
         float power_area = length(cross(light.u, light.v));
         float3 radiance = (light.color * light.power / power_area / PI) * NdotL_light * attenuation;
 
-        float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
+        float3 shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (true) {
             float NdotL = abs(dot(N, L));
@@ -782,7 +842,7 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
 
         float3 radiance = light.color * light.power;
         
-        float shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, 10000.0, payload.seed);
+        float3 shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, 10000.0, payload.seed);
         
         if (true) {
             float NdotL = abs(dot(N, L));
@@ -800,6 +860,23 @@ float TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 d
 
     SampleIndirect(payload.seed, N, V, world_pos, albedo, roughness, metallic, F0, transmission, eta, L_indirect, throughput_weight, next_origin);
     
+    float cos_in = dot(-V, world_normal);
+    float cos_out = dot(L_indirect, world_normal);
+    bool is_transmission = (cos_in * cos_out > 0.0); 
+
+    if (is_transmission) {
+        if (front_face) {
+            payload.is_inside = true;
+            payload.current_sigma_a = mat.vol_sigma_a;
+            payload.current_sigma_s = mat.vol_sigma_s;
+        } else {
+            payload.is_inside = false;
+            payload.current_sigma_a = float3(0, 0, 0);
+            payload.current_sigma_s = float3(0, 0, 0);
+        }
+    }
+
+
     payload.throughput = throughput_weight;
     payload.direction = L_indirect;
     payload.origin = next_origin;
