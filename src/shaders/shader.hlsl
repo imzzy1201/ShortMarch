@@ -147,8 +147,8 @@ static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 8;
 static const float DIRECT_CLAMP = 11.0;
 static const float INDIRECT_CLAMP = 6.0;
-//static const float ISO_MULTIPLIER = 1.6;
-static const float ISO_MULTIPLIER = 1.0;
+static const float ISO_MULTIPLIER = 1.6;
+//static const float ISO_MULTIPLIER = 1.0;
 static const float GAMMA = 1.0 / 2.0;
 
 float3 clamp_direct(float3 color) {
@@ -182,6 +182,7 @@ struct RayPayload {
     bool is_inside;
     float3 current_sigma_a;
     float3 current_sigma_s;
+    float current_vol_g;
 };
 
 float2 sample_disk(inout uint seed, float radius)
@@ -244,6 +245,10 @@ float2 sample_disk(inout uint seed, float radius)
         payload.hit = false;
         payload.instance_id = 0;
         payload.is_shadow = false;
+        payload.is_inside = true;
+        payload.current_sigma_a = float3(0.01f, 0.01f, 0.01f);
+        payload.current_sigma_s = float3(0.15f, 0.15f, 0.15f);
+        payload.current_vol_g = 0.7f;
 
         TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
 
@@ -629,6 +634,46 @@ float3 TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 
     return transmittance;
 }
 
+float SampleFreeFlight(inout uint seed, float sigma_t_avg) {
+    if (sigma_t_avg <= 1e-6) return 1e20;
+    float xi = rnd(seed);
+    xi = max(xi, 1e-6);
+    return -log(xi) / sigma_t_avg;
+}
+
+float3 SamplePhaseDirection(inout uint seed, float3 incident, float g) {
+    float xi1 = rnd(seed);
+    float xi2 = rnd(seed);
+    float cosTheta;
+    if (abs(g) < 1e-3) {
+        cosTheta = 1.0 - 2.0 * xi1;
+    } else {
+        float sq = (1.0 - g * g) / (1.0 - g + 2.0 * g * xi1);
+        cosTheta = (1.0 + g * g - sq * sq) / (2.0 * g);
+    }
+    float phi = 2.0 * PI * xi2;
+    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+
+    float x = sinTheta * cos(phi);
+    float y = sinTheta * sin(phi);
+    float z = cosTheta;
+
+    float3 wi = normalize(incident);
+    float3 up = abs(wi.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+    float3 tangent = normalize(cross(up, wi));
+    float3 bitangent = cross(wi, tangent);
+
+    return normalize(tangent * x + bitangent * y + wi * z);
+}
+
+// Henyey-Greenstein phase function (normalized over the sphere)
+float HenyeyGreensteinPhase(float cosTheta, float g) {
+    float denom = 1.0 + g * g - 2.0 * g * cosTheta;
+    denom = max(denom, 1e-6);
+    float num = (1.0 - g * g);
+    return (num) / (4.0 * PI * pow(denom, 1.5));
+}
+
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
 	// Get material index from instance
 	uint instance_id = InstanceID();
@@ -636,10 +681,123 @@ float3 TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 
 	// Load material
 	Material mat = materials[instance_id];
 
-    if (payload.is_inside) {
+    if (payload.is_inside && !payload.is_shadow) {
         float dist = RayTCurrent();
-        float3 sigma_t = payload.current_sigma_a + payload.current_sigma_s;
-        payload.throughput *= exp(-sigma_t * dist);
+        float3 sigma_a = payload.current_sigma_a;
+        float3 sigma_s = payload.current_sigma_s;
+        float3 sigma_t = sigma_a + sigma_s;
+
+        float sigma_t_avg = max((sigma_t.x + sigma_t.y + sigma_t.z) / 3.0, 1e-6);
+        float s = SampleFreeFlight(payload.seed, sigma_t_avg);
+
+        if (s < dist) {
+            float3 tr = exp(-sigma_t * s);
+            float pdf = sigma_t_avg * exp(-sigma_t_avg * s);
+            pdf = max(pdf, 1e-6);
+
+            float3 throughput_scatter = (sigma_s * tr) / max(pdf,1e-6);
+
+            float3 incident = -normalize(WorldRayDirection());
+            float3 new_dir = SamplePhaseDirection(payload.seed, incident, payload.current_vol_g);
+
+            float3 scatter_pos = WorldRayOrigin() + WorldRayDirection() * s;
+
+            // Compute single-scattering in-scatter contribution at the scattering point
+            float3 in_scatter = float3(0, 0, 0);
+            float g = payload.current_vol_g;
+
+            // Point Lights
+            for (uint i = 0; i < scene_info.num_point_lights; i++) {
+                PointLight light = point_lights[i];
+                float3 lightPos = light.position;
+                if (light.radius > 0.0) {
+                    float r1 = rnd(payload.seed);
+                    float r2 = rnd(payload.seed);
+                    float z = 1.0 - 2.0 * r1;
+                    float r = sqrt(max(0.0, 1.0 - z * z));
+                    float phi = 2.0 * PI * r2;
+                    float3 randomDir = float3(r * cos(phi), r * sin(phi), z);
+                    lightPos += randomDir * light.radius;
+                }
+
+                float3 L = normalize(lightPos - scatter_pos);
+                float distL = length(lightPos - scatter_pos);
+                float attenuation = 1.0 / (distL * distL);
+                float3 radiance = light.color * light.power * attenuation / (4.0 * PI);
+
+                float cosTheta = dot(L, new_dir);
+                float phase = HenyeyGreensteinPhase(cosTheta, g);
+
+                float3 shadow_hit = TraceShadowRay(as, scatter_pos + L * 0.001, L, distL - 0.001, payload.seed);
+                in_scatter += shadow_hit * radiance * phase;
+            }
+
+            // Area Lights
+            for (uint k = 0; k < scene_info.num_area_lights; k++) {
+                AreaLight light = area_lights[k];
+                float r1 = rnd(payload.seed);
+                float r2 = rnd(payload.seed);
+                float3 lightPos = light.position + light.u * r1 + light.v * r2;
+
+                float3 L = normalize(lightPos - scatter_pos);
+                float distL = length(lightPos - scatter_pos);
+                float attenuation = 1.0 / (distL * distL);
+
+                float3 lightNormal = normalize(cross(light.u, light.v));
+                float NdotL_light = max(dot(-L, lightNormal), 0.0);
+
+                float power_area = length(cross(light.u, light.v));
+                float3 radiance = (light.color * light.power / power_area / PI) * NdotL_light * attenuation;
+
+                float cosTheta = dot(L, new_dir);
+                float phase = HenyeyGreensteinPhase(cosTheta, g);
+
+                float3 shadow_hit = TraceShadowRay(as, scatter_pos + L * 0.001, L, distL - 0.001, payload.seed);
+                in_scatter += shadow_hit * radiance * phase;
+            }
+
+            // Sun Lights
+            for (uint j = 0; j < scene_info.num_sun_lights; j++) {
+                SunLight light = sun_lights[j];
+                float3 L = normalize(-light.direction);
+
+                if (light.angle > 0.0) {
+                    float r1 = rnd(payload.seed);
+                    float r2 = rnd(payload.seed);
+                    float radius = tan(radians(light.angle * 0.5));
+                    float r = sqrt(r1) * radius;
+                    float phi = 2.0 * PI * r2;
+
+                    float3 up = abs(L.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+                    float3 tangent = normalize(cross(up, L));
+                    float3 bitangent = cross(L, tangent);
+
+                    L = normalize(L + tangent * (r * cos(phi)) + bitangent * (r * sin(phi)));
+                }
+
+                float3 radiance = light.color * light.power;
+
+                float3 shadow_hit = TraceShadowRay(as, scatter_pos + L * 0.001, L, 10000.0, payload.seed);
+
+                float cosTheta = dot(L, new_dir);
+                float phase = HenyeyGreensteinPhase(cosTheta, g);
+
+                in_scatter += shadow_hit * radiance * phase;
+            }
+
+            // Treat in-scatter as an immediate source (scaled by scattering throughput)
+            float3 scatter_emission = in_scatter * throughput_scatter;
+
+            payload.hit = false;
+            payload.instance_id = instance_id;
+            payload.origin = scatter_pos + new_dir * 0.001; 
+            payload.throughput = throughput_scatter;
+            payload.color = scatter_emission;
+
+            return;
+        } else {
+            payload.throughput *= exp(-sigma_t * dist);
+        }
     }
     
     // Fetch Geometry
@@ -725,11 +883,13 @@ float3 TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 
                 payload.is_inside = true;
                 payload.current_sigma_a = mat.vol_sigma_a;
                 payload.current_sigma_s = mat.vol_sigma_s;
+                payload.current_vol_g = mat.vol_g;
             } else {
                 // Exiting the material
                 payload.is_inside = false;
                 payload.current_sigma_a = float3(0.0, 0.0, 0.0);
                 payload.current_sigma_s = float3(0.0, 0.0, 0.0);
+                payload.current_vol_g = 0.0;
             }
 
             payload.origin = world_pos + WorldRayDirection() * 0.001;
@@ -869,10 +1029,12 @@ float3 TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 
             payload.is_inside = true;
             payload.current_sigma_a = mat.vol_sigma_a;
             payload.current_sigma_s = mat.vol_sigma_s;
+            payload.current_vol_g = mat.vol_g;
         } else {
             payload.is_inside = false;
             payload.current_sigma_a = float3(0, 0, 0);
             payload.current_sigma_s = float3(0, 0, 0);
+            payload.current_vol_g = 0.0;
         }
     }
 
