@@ -12,8 +12,8 @@
   - [ ] Implement an adaptive mipmap algorithm (2pts)
 - [x] Importance Sampling: Use more advanced sampling algorithms for path tracing. (Importance sampling with Russian Roulette, multiple importance sampling 2pts)
 - [ ] Volumetric Rendering: Options include:
-  - [ ] Subsurface scattering (2pts)
-  - [ ] Homogeneous volume rendering (1pt)
+  - [x] Subsurface scattering (2pts)
+  - [x] Homogeneous volume rendering (1pt)
   - [ ] Inhomogeneous volume rendering (1pt)
   - [ ] Channel-independent subsurface scattering (1pt)
   - [ ] Volumetric emission (1pt)

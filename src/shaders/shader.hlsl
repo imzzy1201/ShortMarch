@@ -245,6 +245,7 @@ float2 sample_disk(inout uint seed, float radius)
         payload.hit = false;
         payload.instance_id = 0;
         payload.is_shadow = false;
+        //TBD:determine the camera position is inside or outside the volumetric medium
         payload.is_inside = true;
         payload.current_sigma_a = float3(0.01f, 0.01f, 0.01f);
         payload.current_sigma_s = float3(0.15f, 0.15f, 0.15f);
