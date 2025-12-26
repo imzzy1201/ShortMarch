@@ -441,8 +441,9 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         if (F.x >= 1.0) return float3(0, 0, 0); // TIR or grazing angle, no transmission
         
         float sqrtDenom = (eta * VdotH + LdotH);
-        float common = (NDF * G * VdotH * LdotH) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
         
+        float common = (NDF * G * VdotH * LdotH * (eta * eta)) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
+
         return albedo * (1.0 - F) * common * (1.0 - metallic) * transmission;
     } else {
         // Reflection
@@ -463,6 +464,30 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
     }
 }
 
+// Evaluate clearcoat microfacet specular lobe including Fresnel (F0 ~= 0.04) and clearcoat thickness
+float3 EvalClearcoatBSDF(float3 N, float3 V, float3 L, float roughness, float clearcoat_thickness) {
+    float NdotL = dot(N, L);
+    float NdotV = dot(N, V);
+
+    if (NdotL <= 0.0 || NdotV <= 0.0) return float3(0, 0, 0);
+
+    float3 H = normalize(V + L);
+    float VdotH = max(dot(V, H), 0.0);
+
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float NdotH = max(dot(N, H), 0.0);
+    float d = (NdotH * NdotH * (alpha2 - 1.0) + 1.0);
+    float D = alpha2 / (PI * d * d);
+
+    float G = 1.0 / (4.0 * max(NdotL, 0.01) * max(NdotV, 0.01));
+
+    // Fresnel for clearcoat uses dielectric F0 ~= 0.04; scale by clearcoat_thickness to modulate strength
+    float Fc = FresnelSchlick(VdotH, float3(0.04, 0.04, 0.04)).x * clearcoat_thickness;
+
+    return float3(Fc * D * G, Fc * D * G, Fc * D * G);
+}
+
 void SampleIndirect(
     inout uint seed,
     float3 N,
@@ -474,6 +499,8 @@ void SampleIndirect(
     float3 F0,
     float transmission,
     float eta,
+    float clearcoat_thickness,
+    float clearcoat_roughness,
     out float3 L_indirect,
     out float3 throughput_weight,
     out float3 next_origin
@@ -481,98 +508,142 @@ void SampleIndirect(
     throughput_weight = float3(0, 0, 0);
     next_origin = world_pos + N * 0.001;
     
-    float F_d = FresnelDielectric(max(dot(N, V), 0.0), eta).x;
-    
-    float w_spec_refl = metallic + (1.0 - metallic) * F_d;
-    float w_spec_trans = (1.0 - metallic) * (1.0 - F_d) * transmission;
-    float w_diffuse = (1.0 - metallic) * (1.0 - F_d) * (1.0 - transmission);
-    
-    float w_sum = w_spec_refl + w_spec_trans + w_diffuse;
-    if (w_sum < 0.0001) w_sum = 1.0;
-    
+    // Clearcoat Fresnel (dielectric F0 ~= 0.04). This represents the top-layer reflection probability.
+    float NoV = max(dot(N, V), 0.0);
+    float Fcc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * clearcoat_thickness;
+
+    // Base-material Fresnel (for metallic blending / transmission decisions)
+    float F_d = FresnelDielectric(NoV, eta).x;
+
+    float w_spec_refl_base = metallic + (1.0 - metallic) * F_d;
+    float w_spec_trans_base = (1.0 - metallic) * (1.0 - F_d) * transmission;
+    float w_diffuse_base = (1.0 - metallic) * (1.0 - F_d) * (1.0 - transmission);
+
+    // Total sampling weights: clearcoat lobe + scaled base lobes
+    float w_base_sum = w_spec_refl_base + w_spec_trans_base + w_diffuse_base;
+    if (w_base_sum < 1e-6) w_base_sum = 1.0;
+
+    float w_cc = Fcc;
+    float w_base = (1.0 - w_cc) * w_base_sum;
+    float w_sum = w_cc + w_base;
+
     float u_lobe = rnd(seed) * w_sum;
-    
-    if (u_lobe < w_spec_refl) {
-        // Sample Reflection
+
+    if (u_lobe < w_cc) {
+        // Sample clearcoat reflection (microfacet) -- purely reflection
         float2 u = float2(rnd(seed), rnd(seed));
-        float3 H = SampleGGX(u, N, roughness);
+        float3 H = SampleGGX(u, N, clearcoat_roughness);
         L_indirect = reflect(-V, H);
-        
+
         float NdotL_indirect = max(dot(N, L_indirect), 0.0);
         if (NdotL_indirect > 0.0) {
-             float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
-             
-             float3 H_indirect = normalize(V + L_indirect);
-             float NdotH = max(dot(N, H_indirect), 0.0);
-             float HdotV = max(dot(H_indirect, V), 0.0);
-             float NDF = DistributionGGX(N, H_indirect, roughness);
-             float pdf_spec = NDF * NdotH / (4.0 * HdotV + 0.0001);
-             
-             float pdf = (w_spec_refl / w_sum) * pdf_spec;
-             if (pdf > 0.001) {
-                 throughput_weight = bsdf * NdotL_indirect / pdf;
-             }
-        }
-        next_origin = world_pos + N * 0.001;
-    } else if (u_lobe < w_spec_refl + w_spec_trans) {
-        // Sample Transmission
-        if (abs(eta - 1.0) < 1e-4) {
-            L_indirect = -V;
-            float pdf = w_spec_trans / w_sum;
-            throughput_weight = (albedo * transmission) / pdf;
-            next_origin = world_pos + L_indirect * 0.001;
-        } else {
-            float2 u = float2(rnd(seed), rnd(seed));
-            float3 H = SampleGGX(u, N, roughness);
-            L_indirect = refract(-V, H, eta);
-            
-            if (length(L_indirect) > 0.0) {
-                float3 h_vec = V * eta + L_indirect;
-                if (length(h_vec) < 1e-6) {
-                    throughput_weight = float3(0, 0, 0);
-                } else {
-                    float3 H_indirect = -normalize(h_vec);
-                    if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
-                    
-                    float VdotH = abs(dot(V, H_indirect));
-                    float NdotH = abs(dot(N, H_indirect));
-                    float LdotH = abs(dot(L_indirect, H_indirect));
-                    
-                    float NDF = DistributionGGX(N, H_indirect, roughness);
-                    
-                    // PDF for transmission
-                    float sqrtDenom = (eta * VdotH + LdotH);
-                    float pdf_trans = NDF * NdotH * LdotH / max(sqrtDenom * sqrtDenom, 1e-5);
-                    
-                    float pdf = (w_spec_trans / w_sum) * pdf_trans;
-                    
-                    if (pdf > 0.001) {
-                        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
-                        throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
-                    }
-                }
-                
-                next_origin = world_pos + L_indirect * 0.001;
-            } else {
-                throughput_weight = float3(0, 0, 0);
+            float3 bsdf = EvalClearcoatBSDF(N, V, L_indirect, clearcoat_roughness, clearcoat_thickness);
+
+            float HdotV = max(dot(H, V), 1e-6);
+            float NdotH = max(dot(N, H), 0.0);
+            float NDF = DistributionGGX(N, H, clearcoat_roughness);
+            float pdf_spec = NDF * NdotH / (4.0 * HdotV + 1e-6);
+
+            float pdf = (w_cc / w_sum) * pdf_spec;
+            if (pdf > 1e-6) {
+                throughput_weight = bsdf * NdotL_indirect / pdf;
             }
         }
-    } else {
-        // Sample Diffuse
-        float2 u = float2(rnd(seed), rnd(seed));
-        L_indirect = SampleCosineHemisphere(u, N);
-        
-        float NdotL_indirect = max(dot(N, L_indirect), 0.0);
-        if (NdotL_indirect > 0.0) {
-             float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
-             float pdf_diff = NdotL_indirect / PI;
-             float pdf = (w_diffuse / w_sum) * pdf_diff;
-             
-             if (pdf > 0.001) {
-                 throughput_weight = bsdf * NdotL_indirect / pdf;
-             }
-        }
         next_origin = world_pos + N * 0.001;
+    } else {
+        // Sample base-layer lobes (scaled by 1 - Fcc)
+        float u_remapped = (u_lobe - w_cc) / w_base; // in [0,1) across base lobes
+
+        // Normalize base lobes for selection
+        float w_spec_refl = w_spec_refl_base / w_base_sum;
+        float w_spec_trans = w_spec_trans_base / w_base_sum;
+        float w_diffuse = w_diffuse_base / w_base_sum;
+
+        if (u_remapped < w_spec_refl) {
+            // Sample base reflection
+            float2 u = float2(rnd(seed), rnd(seed));
+            float3 H = SampleGGX(u, N, roughness);
+            L_indirect = reflect(-V, H);
+
+            float NdotL_indirect = max(dot(N, L_indirect), 0.0);
+            if (NdotL_indirect > 0.0) {
+                float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+
+                float HdotV = max(dot(H, V), 1e-6);
+                float NdotH = max(dot(N, H), 0.0);
+                float NDF = DistributionGGX(N, H, roughness);
+                float pdf_spec = NDF * NdotH / (4.0 * HdotV + 1e-6);
+
+                float pdf = ( (1.0 - w_cc) * (w_spec_refl_base / w_base_sum) ) / w_sum * pdf_spec * w_sum; // simplifies to (1-w_cc)*(w_spec_refl_base/w_base_sum)*pdf_spec/w_sum * w_sum => (1-w_cc)*(w_spec_refl_base/w_base_sum)*pdf_spec
+                // Instead compute directly
+                pdf = ( (1.0 - w_cc) * (w_spec_refl_base / w_base_sum) ) / w_sum * pdf_spec * w_sum; // keep stable form
+                // To avoid confusion, compute pdf as fraction of total: pdf = ( (1-w_cc) * (w_spec_refl_base / w_base_sum) )/w_sum * pdf_spec
+                pdf = ((1.0 - w_cc) * (w_spec_refl_base / w_base_sum)) / w_sum * pdf_spec;
+
+                if (pdf > 1e-6) {
+                    throughput_weight = bsdf * NdotL_indirect / pdf;
+                }
+            }
+            next_origin = world_pos + N * 0.001;
+        } else if (u_remapped < (w_spec_refl + w_spec_trans)) {
+            // Sample base transmission
+            if (abs(eta - 1.0) < 1e-4) {
+                L_indirect = -V;
+                float pdf = ((1.0 - w_cc) * (w_spec_trans_base / w_base_sum)) / w_sum;
+                if (pdf > 1e-6) throughput_weight = (albedo * transmission) / pdf;
+                next_origin = world_pos + L_indirect * 0.001;
+            } else {
+                float2 u = float2(rnd(seed), rnd(seed));
+                float3 H = SampleGGX(u, N, roughness);
+                L_indirect = refract(-V, H, eta);
+
+                if (length(L_indirect) > 0.0) {
+                    float3 h_vec = V * eta + L_indirect;
+                    if (length(h_vec) < 1e-6) {
+                        throughput_weight = float3(0, 0, 0);
+                    } else {
+                        float3 H_indirect = -normalize(h_vec);
+                        if (dot(H_indirect, N) < 0) H_indirect = -H_indirect;
+
+                        float VdotH = abs(dot(V, H_indirect));
+                        float NdotH = abs(dot(N, H_indirect));
+                        float LdotH = abs(dot(L_indirect, H_indirect));
+
+                        float NDF = DistributionGGX(N, H_indirect, roughness);
+
+                        float sqrtDenom = (eta * VdotH + LdotH);
+                        float pdf_trans = NDF * NdotH * LdotH / max(sqrtDenom * sqrtDenom, 1e-5);
+
+                        float pdf = ((1.0 - w_cc) * (w_spec_trans_base / w_base_sum)) / w_sum * pdf_trans;
+
+                        if (pdf > 1e-6) {
+                            float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                            throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
+                        }
+                    }
+
+                    next_origin = world_pos + L_indirect * 0.001;
+                } else {
+                    throughput_weight = float3(0, 0, 0);
+                }
+            }
+        } else {
+            // Sample base diffuse
+            float2 u = float2(rnd(seed), rnd(seed));
+            L_indirect = SampleCosineHemisphere(u, N);
+
+            float NdotL_indirect = max(dot(N, L_indirect), 0.0);
+            if (NdotL_indirect > 0.0) {
+                float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                float pdf_diff = NdotL_indirect / PI;
+                float pdf = ((1.0 - w_cc) * (w_diffuse_base / w_base_sum)) / w_sum * pdf_diff;
+
+                if (pdf > 1e-6) {
+                    throughput_weight = bsdf * NdotL_indirect / pdf;
+                }
+            }
+            next_origin = world_pos + N * 0.001;
+        }
     }
 }
 
@@ -634,6 +705,8 @@ float3 TraceShadowRay(RaytracingAccelerationStructure as, float3 origin, float3 
     }
     return transmittance;
 }
+
+// (Removed duplicate EvalClearcoatBSDF - clearcoat evaluation is implemented above which includes Fresnel and thickness)
 
 float SampleFreeFlight(inout uint seed, float sigma_t_avg) {
     if (sigma_t_avg <= 1e-6) return 1e20;
@@ -946,6 +1019,10 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
     float transmission = 1.0 - mat.dissolve;
     float ior = mat.ior;
     // if (ior < 1.0) ior = 1.5;
+    float cc_weight = mat.clearcoat_thickness;
+    float cc_roughness = max(mat.clearcoat_roughness, 0.001);
+    float NoV = saturate(dot(N, V));
+    float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
     
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 
@@ -978,9 +1055,15 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
         float3 shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (true) {
+            float3 clearcoat_brdf = EvalClearcoatBSDF(N, V, L, mat.clearcoat_roughness, mat.clearcoat_thickness);
+            float NoV = max(dot(N, V), 0.0);
+            float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
+            
             float NdotL = abs(dot(N, L));
-            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
-            Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
+            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
+            float3 total_bsdf = clearcoat_brdf + base_bsdf * (1.0 - Fc);
+
+            Lo += shadow_hit * clamp_direct(total_bsdf * radiance * abs(NdotL));
         }
     }
 
@@ -1004,9 +1087,15 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
         float3 shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, dist - 0.001, payload.seed);
 
         if (true) {
+            float3 clearcoat_brdf = EvalClearcoatBSDF(N, V, L, mat.clearcoat_roughness, mat.clearcoat_thickness);
+            float NoV = max(dot(N, V), 0.0);
+            float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
+            
             float NdotL = abs(dot(N, L));
-            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
-            Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
+            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
+            float3 total_bsdf = clearcoat_brdf + base_bsdf * (1.0 - Fc);
+
+            Lo += shadow_hit * clamp_direct(total_bsdf * radiance * abs(NdotL));
         }
     }
 
@@ -1034,9 +1123,15 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
         float3 shadow_hit = TraceShadowRay(as, world_pos + N * 0.001, L, 10000.0, payload.seed);
         
         if (true) {
+            float3 clearcoat_brdf = EvalClearcoatBSDF(N, V, L, mat.clearcoat_roughness, mat.clearcoat_thickness);
+            float NoV = max(dot(N, V), 0.0);
+            float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
+            
             float NdotL = abs(dot(N, L));
-            float3 bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
-            Lo += shadow_hit * clamp_direct(bsdf * radiance * NdotL);
+            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
+            float3 total_bsdf = clearcoat_brdf + base_bsdf * (1.0 - Fc);
+
+            Lo += shadow_hit * clamp_direct(total_bsdf * radiance * abs(NdotL));
         }
     }
 
@@ -1047,7 +1142,7 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
     float3 throughput_weight;
     float3 next_origin;
 
-    SampleIndirect(payload.seed, N, V, world_pos, albedo, roughness, metallic, F0, transmission, eta, L_indirect, throughput_weight, next_origin);
+    SampleIndirect(payload.seed, N, V, world_pos, albedo, roughness, metallic, F0, transmission, eta, mat.clearcoat_thickness, mat.clearcoat_roughness, L_indirect, throughput_weight, next_origin);
     
     float cos_in = dot(-V, world_normal);
     float cos_out = dot(L_indirect, world_normal);
