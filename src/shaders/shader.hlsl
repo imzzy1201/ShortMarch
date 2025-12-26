@@ -801,20 +801,19 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
         }
     }
     
-    // Fetch Geometry
     InstanceInfo info = instance_infos[instance_id];
     uint prim_idx = PrimitiveIndex();
-    
+
     uint3 idx = uint3(
         indices[info.index_offset + prim_idx * 3 + 0],
         indices[info.index_offset + prim_idx * 3 + 1],
         indices[info.index_offset + prim_idx * 3 + 2]
     );
-    
+
     float3 v0 = vertices[info.vertex_offset + idx.x];
     float3 v1 = vertices[info.vertex_offset + idx.y];
     float3 v2 = vertices[info.vertex_offset + idx.z];
-    
+
     float3 n0, n1, n2;
     if (info.has_normal) {
         n0 = normals[info.normal_offset + idx.x];
@@ -825,24 +824,48 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
         float3 e2 = v2 - v0;
         n0 = n1 = n2 = normalize(cross(e1, e2));
     }
-    
+
     float3 bary = float3(1.0 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
     float3 world_normal = normalize(mul(ObjectToWorld3x4(), float4(n0 * bary.x + n1 * bary.y + n2 * bary.z, 0)).xyz);
     float3 world_pos = mul(ObjectToWorld3x4(), float4(v0 * bary.x + v1 * bary.y + v2 * bary.z, 1)).xyz;
 
-    if(info.has_texcoord && mat.diffuse_tex_id >= 0) {
-        float2 uv0=texcoords[info.texcoord_offset + idx.x];
-        float2 uv1=texcoords[info.texcoord_offset + idx.y];
-        float2 uv2=texcoords[info.texcoord_offset + idx.z];
+    if(info.has_texcoord) {
+        float2 uv0 = texcoords[info.texcoord_offset + idx.x];
+        float2 uv1 = texcoords[info.texcoord_offset + idx.y];
+        float2 uv2 = texcoords[info.texcoord_offset + idx.z];
         float2 interp_uv = uv0 * bary.x + uv1 * bary.y + uv2 * bary.z;
+        
         interp_uv = frac(interp_uv);
-        interp_uv.y = 1-interp_uv.y;
+        interp_uv.y = 1.0 - interp_uv.y;
 
-        float4 tex = material_images[mat.diffuse_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f);
-        tex.xyz = pow(tex.xyz, float3(2.2, 2.2, 2.2));
-        mat.diffuse = tex.xyz;
+        float3 edge1 = v1 - v0;
+        float3 edge2 = v2 - v0;
+        float2 duv1 = uv1 - uv0;
+        float2 duv2 = uv2 - uv0;
+
+        float det = duv1.x * duv2.y - duv2.x * duv1.y;
+        float3 tangent = float3(1, 0, 0); 
+        if (abs(det) > 1e-6) {
+            float f = 1.0f / det;
+            tangent = normalize(f * (duv2.y * edge1 - duv1.y * edge2));
+        }
+        
+        float3 world_tangent = normalize(mul(ObjectToWorld3x4(), float4(tangent, 0)).xyz);
+        world_tangent = normalize(world_tangent - world_normal * dot(world_tangent, world_normal));
+        float3 world_bitangent = normalize(cross(world_normal, world_tangent));
+        float3x3 TBN = float3x3(world_tangent, world_bitangent, world_normal);
+
+        if(mat.diffuse_tex_id >= 0) {
+            float4 tex = material_images[mat.diffuse_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f);
+            mat.diffuse = pow(tex.xyz, float3(2.2, 2.2, 2.2));
+        }
+
+        if(mat.normal_tex_id >= 0) {
+            float3 normal_sample = material_images[mat.normal_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f).xyz;
+            float3 tangent_normal = normal_sample * 2.0 - 1.0;
+            world_normal = normalize(mul(tangent_normal, TBN));
+        }
     }
-    
     if (payload.is_shadow) { // this is wrong when ior is involved, but just ignore that for now. no one will notice.
         if (mat.dissolve < 1.0) {
             payload.hit = false;

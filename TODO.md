@@ -8,7 +8,8 @@
   - [ ] Rendering of fur, hair, skin, etc. (2pts)
 - [ ] Texture: Create your own (non-trivial) texture with proper texture mapping. Options include
   - [x] Color texture (**basic**)
-  - [x] Normal map, height map, attribute map, or any functional texture mapping (1pt for each, up to 2pts)
+  - [ ] Normal map, height map, attribute map, or any functional texture mapping (1pt for each, up to 2pts)
+    - [x] Normal map(1pts)
   - [ ] Implement an adaptive mipmap algorithm (2pts)
 - [x] Importance Sampling: Use more advanced sampling algorithms for path tracing. (Importance sampling with Russian Roulette, multiple importance sampling 2pts)
 - [ ] Volumetric Rendering: Options include:
@@ -17,7 +18,7 @@
   - [ ] Inhomogeneous volume rendering (1pt)
   - [ ] Channel-independent subsurface scattering (1pt)
   - [ ] Volumetric emission (1pt)
-  - [ ] Volumetric alpha shadow (2pts)
+  - [x] Volumetric alpha shadow (2pts)
 - [ ] Special Visual Effects: Options include:
   - [ ] Motion blur, depth of field (**basic**)
   - [x] Alpha shadow (**basic**)
