@@ -688,15 +688,18 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
         float3 sigma_s = payload.current_sigma_s;
         float3 sigma_t = sigma_a + sigma_s;
 
-        float sigma_t_avg = max((sigma_t.x + sigma_t.y + sigma_t.z) / 3.0, 1e-6);
-        float s = SampleFreeFlight(payload.seed, sigma_t_avg);
+        float rand_chan = rnd(payload.seed);
+        int channel = (rand_chan < 0.333f) ? 0 : (rand_chan < 0.666f ? 1 : 2);
+        float selected_sigma_t = (channel == 0) ? sigma_t.x : (channel == 1 ? sigma_t.y : sigma_t.z);
+        selected_sigma_t = max(selected_sigma_t, 1e-6);
+        float s = SampleFreeFlight(payload.seed, selected_sigma_t);
 
         if (s < dist) {
             float3 tr = exp(-sigma_t * s);
-            float pdf = sigma_t_avg * exp(-sigma_t_avg * s);
+            float pdf = (selected_sigma_t * exp(-selected_sigma_t * s));
             pdf = max(pdf, 1e-6);
 
-            float3 throughput_scatter = (sigma_s * tr) / max(pdf,1e-6);
+            float3 throughput_scatter = (sigma_s * tr) / (0.333f * pdf);
 
             float3 incident = -normalize(WorldRayDirection());
             float3 new_dir = SamplePhaseDirection(payload.seed, incident, payload.current_vol_g);
@@ -797,7 +800,9 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
 
             return;
         } else {
-            payload.throughput *= exp(-sigma_t * dist);
+            float3 tr = exp(-sigma_t * dist);
+            float prob_no_scatter = exp(-selected_sigma_t * dist);
+            payload.throughput *= (tr / max(prob_no_scatter, 1e-6));
         }
     }
     
@@ -860,11 +865,11 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
             mat.diffuse = pow(tex.xyz, float3(2.2, 2.2, 2.2));
         }
 
-        if(mat.normal_tex_id >= 0) {
-            float3 normal_sample = material_images[mat.normal_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f).xyz;
-            float3 tangent_normal = normal_sample * 2.0 - 1.0;
-            world_normal = normalize(mul(tangent_normal, TBN));
-        }
+        // if(mat.normal_tex_id >= 0) {
+        //     float3 normal_sample = material_images[mat.normal_tex_id].SampleLevel(material_sampler, interp_uv, 0.0f).xyz;
+        //     float3 tangent_normal = normal_sample * 2.0 - 1.0;
+        //     world_normal = normalize(mul(tangent_normal, TBN));
+        // }
     }
     if (payload.is_shadow) { // this is wrong when ior is involved, but just ignore that for now. no one will notice.
         if (mat.dissolve < 1.0) {

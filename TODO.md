@@ -9,14 +9,13 @@
 - [ ] Texture: Create your own (non-trivial) texture with proper texture mapping. Options include
   - [x] Color texture (**basic**)
   - [ ] Normal map, height map, attribute map, or any functional texture mapping (1pt for each, up to 2pts)
-    - [x] Normal map(1pts)
   - [ ] Implement an adaptive mipmap algorithm (2pts)
 - [x] Importance Sampling: Use more advanced sampling algorithms for path tracing. (Importance sampling with Russian Roulette, multiple importance sampling 2pts)
 - [ ] Volumetric Rendering: Options include:
   - [x] Subsurface scattering (2pts)
   - [x] Homogeneous volume rendering (1pt)
   - [ ] Inhomogeneous volume rendering (1pt)
-  - [ ] Channel-independent subsurface scattering (1pt)
+  - [x] Channel-independent subsurface scattering (1pt)
   - [ ] Volumetric emission (1pt)
   - [x] Volumetric alpha shadow (2pts)
 - [ ] Special Visual Effects: Options include:
