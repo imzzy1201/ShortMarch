@@ -4,7 +4,7 @@
 - [ ] Material: Create a (non-trivial) custom material. Options include:
   - [x] Transmissive material (**basic**)
   - [x] Principled BSDF (2pts)
-  - [ ] Multi-layer material (2pts)
+  - [x] Multi-layer material (2pts)
   - [ ] Rendering of fur, hair, skin, etc. (2pts)
 - [ ] Texture: Create your own (non-trivial) texture with proper texture mapping. Options include
   - [x] Color texture (**basic**)
