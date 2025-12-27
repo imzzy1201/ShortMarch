@@ -299,7 +299,7 @@ float2 sample_disk(inout uint seed, float radius)
 	output[pixel_coords] = float4(radiance, 1);
 	
 	// Write entity ID to the ID buffer (only from first hit)
-    if (accumulated_samples[pixel_coords] == 0)
+    if (entity_id_output[pixel_coords] < 0 && first_hit_instance_id >= 0)
         entity_id_output[pixel_coords] = first_hit_instance_id; 
 	
 	// Accumulate color for progressive rendering (when camera is stationary)
