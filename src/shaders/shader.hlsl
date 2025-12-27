@@ -250,6 +250,7 @@ float2 sample_disk(inout uint seed, float radius)
         payload.current_sigma_a = float3(0.01f, 0.01f, 0.01f);
         payload.current_sigma_s = float3(0.15f, 0.15f, 0.15f);
         payload.current_vol_g = 0.7f;
+        //payload.is_inside = false;
 
         TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
 
