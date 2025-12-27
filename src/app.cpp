@@ -312,6 +312,53 @@ void Application::OnInit() {
     sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     scene_->AddSunLight(sun_light); // sun_light
 
+    // DEBUG SCENE:test clearcoat
+
+    // scene_ = std::make_unique<Scene>(core_.get());
+
+
+    // PointLight test_light;
+    // test_light.position = glm::vec3(2.0f, 5.0f, 2.0f);
+    // test_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    // test_light.power = 50.0f; 
+    // test_light.radius = 0.05f;
+    // scene_->AddPointLight(test_light);
+
+    // {
+    //     auto ground_mat = Material();
+    //     ground_mat.diffuse = glm::vec3(0.2f, 0.2f, 0.2f);
+    //     ground_mat.roughness = 0.8f; 
+    //     ground_mat.metallic = 0.0f;
+    //     ground_mat.dissolve = 1.0f;
+        
+    //     ground_mat.clearcoat_thickness = 1.0f;
+    //     //ground_mat.clearcoat_roughness = 0.02f;
+    //     ground_mat.clearcoat_roughness = 1.0f;
+        
+    //     glm::mat4 ground_transform = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.5f, 0.0f)), glm::vec3(10.0f, 0.1f, 10.0f));
+    //     auto ground = std::make_shared<Entity>("meshes/cube.obj", ground_mat, ground_transform);
+    //     scene_->AddEntity(ground);
+    // }
+
+    // {
+    //     auto sphere_mat = Material();
+    //     sphere_mat.diffuse = glm::vec3(0.7f, 0.1f, 0.1f);
+    //     sphere_mat.roughness = 0.5f;
+    //     sphere_mat.metallic = 0.0f;
+    //     sphere_mat.dissolve = 1.0f;
+        
+    //     sphere_mat.clearcoat_thickness = 1.0f;
+    //     sphere_mat.clearcoat_roughness = 0.005f;
+        
+    //     glm::mat4 sphere_transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+    //     sphere_transform = glm::scale(sphere_transform, glm::vec3(1.0f));
+        
+    //     auto octa = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform);
+    //     scene_->AddEntity(octa);
+    // }
+
+    // DEBUG SCENE END
+
     // Add entities to the scene
     // Ground plane - a cube scaled to be flat
     // {
