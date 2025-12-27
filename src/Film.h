@@ -20,6 +20,8 @@ class Film {
     // Get the final output image (averaged result)
     grassland::graphics::Image *GetOutputImage() const { return output_image_.get(); }
 
+    grassland::graphics::Image *GetVelocityImage() const { return velocity_image_.get(); }
+
     // Get current sample count
     int GetSampleCount() const { return sample_count_; }
 
@@ -49,6 +51,8 @@ class Film {
 
     // Final output image (accumulated_color / accumulated_samples)
     std::unique_ptr<grassland::graphics::Image> output_image_;
+
+    std::unique_ptr<grassland::graphics::Image> velocity_image_;
 
     void CreateImages();
 };
