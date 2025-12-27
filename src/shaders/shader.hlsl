@@ -239,20 +239,32 @@ float2 sample_disk(inout uint seed, float radius)
     
     int first_hit_instance_id = -1;
 
+    // Volumetric medium state carried along the path.
+    // Default: start in vacuum/outside any medium.
+    bool current_is_inside = false;
+    float3 current_sigma_a = float3(0.0, 0.0, 0.0);
+    float3 current_sigma_s = float3(0.0, 0.0, 0.0);
+    float current_vol_g = 0.0;
+
     for (int depth = 0; depth < MAX_DEPTH; depth++) {
         payload.color = float3(0, 0, 0);
         payload.throughput = float3(1, 1, 1);
         payload.hit = false;
         payload.instance_id = 0;
         payload.is_shadow = false;
-        //TBD:determine the camera position is inside or outside the volumetric medium
-        payload.is_inside = true;
-        payload.current_sigma_a = float3(0.01f, 0.01f, 0.01f);
-        payload.current_sigma_s = float3(0.15f, 0.15f, 0.15f);
-        payload.current_vol_g = 0.7f;
-        //payload.is_inside = false;
+        // Carry medium state across bounces (when volumetric is enabled).
+        payload.is_inside = current_is_inside;
+        payload.current_sigma_a = current_sigma_a;
+        payload.current_sigma_s = current_sigma_s;
+        payload.current_vol_g = current_vol_g;
 
         TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
+
+        // Update medium state for the next bounce.
+        current_is_inside = payload.is_inside;
+        current_sigma_a = payload.current_sigma_a;
+        current_sigma_s = payload.current_sigma_s;
+        current_vol_g = payload.current_vol_g;
 
         if (depth == 0) {
             first_hit_instance_id = payload.hit ? (int)payload.instance_id : -1;
@@ -626,7 +638,29 @@ void SampleIndirect(
 
                     next_origin = world_pos + L_indirect * 0.001;
                 } else {
-                    throughput_weight = float3(0, 0, 0);
+                    // Total internal reflection (TIR): refraction failed.
+                    // Fall back to reflection instead of killing the path (which causes black glass).
+                    L_indirect = reflect(-V, H);
+
+                    float NdotL_indirect = max(dot(N, L_indirect), 0.0);
+                    if (NdotL_indirect > 0.0) {
+                        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+
+                        float HdotV = max(dot(H, V), 1e-6);
+                        float NdotH = max(dot(N, H), 0.0);
+                        float NDF = DistributionGGX(N, H, roughness);
+                        float pdf_spec = NDF * NdotH / (4.0 * HdotV + 1e-6);
+
+                        // Approximate by assigning the (reflection+transmission) spec mass to the reflection distribution in TIR.
+                        float spec_mass = (w_spec_refl_base + w_spec_trans_base) / max(w_base_sum, 1e-6);
+                        float pdf = ((1.0 - w_cc) * spec_mass) / max(w_sum, 1e-6) * pdf_spec;
+
+                        if (pdf > 1e-6) {
+                            throughput_weight = bsdf * NdotL_indirect / pdf;
+                        }
+                    }
+
+                    next_origin = world_pos + N * 0.001;
                 }
             }
         } else {
