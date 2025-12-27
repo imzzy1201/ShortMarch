@@ -299,9 +299,9 @@ float2 sample_disk(inout uint seed, float radius)
 
     // Prevent NaN/Inf from corrupting the accumulation buffer
     if (any(isnan(radiance))) {
-        radiance = float3(0, 0, 0);
+        radiance = float3(1000, 0, 0);
     } else if(any(isinf(radiance))) {
-        radiance = float3(0, 0, 0);
+        radiance = float3(1000, 0, 0);
     }
 
     radiance = pow(radiance, GAMMA);
@@ -392,8 +392,8 @@ float GeometrySchlickGGX(float NdotV, float roughness) {
 }
 
 float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = abs(dot(N, V));
+    float NdotL = abs(dot(N, L));
     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
     float ggx1 = GeometrySchlickGGX(NdotL, roughness);
     return ggx1 * ggx2;
@@ -439,7 +439,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         // Transmission
         if (transmission <= 0.0) return float3(0, 0, 0);
         
-        float3 h_vec = V * eta + L;
+        float3 h_vec = L * eta + V;
         if (length(h_vec) < 1e-6) return float3(0, 0, 0);
 
         float3 H = -normalize(h_vec);
@@ -454,7 +454,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         float3 F = FresnelDielectric(VdotH, eta);
         if (F.x >= 1.0) return float3(0, 0, 0); // TIR or grazing angle, no transmission
         
-        float sqrtDenom = (eta * VdotH + LdotH);
+        float sqrtDenom = (eta * LdotH - VdotH);
         
         float common = (NDF * G * VdotH * LdotH * (eta * eta)) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
 
@@ -612,7 +612,7 @@ void SampleIndirect(
                 L_indirect = refract(-V, H, eta);
 
                 if (length(L_indirect) > 0.0) {
-                    float3 h_vec = V * eta + L_indirect;
+                    float3 h_vec = L_indirect * eta + V;
                     if (length(h_vec) < 1e-6) {
                         throughput_weight = float3(0, 0, 0);
                     } else {
@@ -625,7 +625,7 @@ void SampleIndirect(
 
                         float NDF = DistributionGGX(N, H_indirect, roughness);
 
-                        float sqrtDenom = (eta * VdotH + LdotH);
+                        float sqrtDenom = (eta * LdotH - VdotH);
                         float pdf_trans = NDF * NdotH * LdotH / max(sqrtDenom * sqrtDenom, 1e-5);
 
                         float pdf = ((1.0 - w_cc) * (w_spec_trans_base / w_base_sum)) / w_sum * pdf_trans;
