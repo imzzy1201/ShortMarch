@@ -249,10 +249,15 @@ float2 sample_disk(inout uint seed, float radius)
 
     // Volumetric medium state carried along the path.
     // Default: start in vacuum/outside any medium.
-    bool current_is_inside = false;
-    float3 current_sigma_a = float3(0.0, 0.0, 0.0);
-    float3 current_sigma_s = float3(0.0, 0.0, 0.0);
-    float current_vol_g = 0.0;
+    // bool current_is_inside = false;
+    // float3 current_sigma_a = float3(0.0, 0.0, 0.0);
+    // float3 current_sigma_s = float3(0.0, 0.0, 0.0);
+    // float current_vol_g = 0.0;
+
+    bool current_is_inside = true;
+    float3 current_sigma_a = float3(0.01, 0.01, 0.01);
+    float3 current_sigma_s = float3(0.15, 0.15, 0.15);
+    float current_vol_g = 0.7;
 
     for (int depth = 0; depth < MAX_DEPTH; depth++) {
         payload.color = float3(0, 0, 0);
