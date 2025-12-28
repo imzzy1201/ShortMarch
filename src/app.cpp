@@ -227,7 +227,7 @@ void Application::OnInit() {
         }
     }
 
-    scene_->LoadEnvironmentMap("meshes/sunny_rose_garden_4k.hdr");
+    scene_->LoadEnvironmentMap("meshes/studio_garden_4k.hdr");
 
     float PI = 3.14159265359f;
 
