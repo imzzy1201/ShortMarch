@@ -89,9 +89,5 @@ struct Material {
         float g = std::max(0.001f, mat.transmittance[1]);
         float b = std::max(0.001f, mat.transmittance[2]);
         
-        if (mat.dissolve < 1.0f) {
-            vol_sigma_a = -glm::log(glm::vec3(r, g, b));
-            vol_sigma_s = glm::vec3(0.0f);
-        }
     }
 };
