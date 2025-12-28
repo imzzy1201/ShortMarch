@@ -35,6 +35,10 @@ class Entity {
     // Check if mesh is loaded
     bool IsValid() const { return mesh_loaded_; }
 
+    // Per-entity velocity (world or pre-projected screen motion stored in xy)
+    const glm::vec3 &GetVelocity() const { return velocity_; }
+    void SetVelocity(const glm::vec3 &v) { velocity_ = v; }
+
   private:
     grassland::Mesh<float> mesh_;
     Material material_;
@@ -45,4 +49,5 @@ class Entity {
     std::unique_ptr<grassland::graphics::AccelerationStructure> blas_;
 
     bool mesh_loaded_;
+    glm::vec3 velocity_ = glm::vec3(0.0f);
 };

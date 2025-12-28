@@ -16,7 +16,7 @@
 #include <iomanip>
 #include <sstream>
 
-static const float FOVY = 46.5f;
+static const float FOVY = 39.59f;
 
 namespace {
 #include "built_in_shaders.inl"
@@ -354,6 +354,7 @@ void Application::OnInit() {
     //     sphere_transform = glm::scale(sphere_transform, glm::vec3(1.0f));
         
     //     auto octa = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform);
+    //     octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
     //     scene_->AddEntity(octa);
     // }
 
@@ -459,8 +460,8 @@ void Application::OnInit() {
     // camera_pos_ = glm::vec3{0.0f, 1.0f, 5.0f};
     // camera_up_ = glm::vec3{0.0f, 1.0f, 0.0f}; // World up
     // camera_speed_ = 0.01f;
-    camera_pos_ = blenderCoordsToGLM(glm::vec3{2.54541f, -4.34681f, 1.09485f});
-    camera_up_ = glm::vec3{0.0f, 1.0f, 0.0f}; // World up
+    camera_pos_ = blenderCoordsToGLM(glm::vec3{2.5764f, -4.4658f, 1.0945f});
+    camera_up_ = blenderCoordsToGLM(glm::vec3{0.00283f, -0.01084f, 0.99994}); // World up
     camera_speed_ = 0.01f;
 
     // Initialize new mouse/view variables
@@ -481,9 +482,22 @@ void Application::OnInit() {
 
     // Set initial camera buffer data
     CameraObject camera_object{};
-    camera_object.screen_to_camera = glm::inverse(
-        glm::perspective(glm::radians(FOVY), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
-    camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
+    glm::mat4 projection = glm::perspective(
+        glm::radians(FOVY),
+        (float)window_->GetWidth() / (float)window_->GetHeight(),
+        0.1f,
+        100.0f
+    );
+
+    glm::mat4 view = glm::lookAt(
+        camera_pos_,
+        camera_pos_ + camera_front_,
+        camera_up_
+    );
+
+    camera_object.screen_to_camera = glm::inverse(projection);
+    camera_object.camera_to_world  = glm::inverse(view);
+    camera_object.view_proj        = projection * view;
     const float focal_length_m = 0.025f;
     const float f_stop = 2.1f;
 
@@ -527,6 +541,7 @@ void Application::OnInit() {
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, image_descriptor_count); // space18
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_SAMPLER, 1); //space19
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, 1); // space20
+    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1); // space21
     program_->Finalize();
 
     core_->CreateSampler(grassland::graphics::SamplerInfo(grassland::graphics::FILTER_MODE_LINEAR), &material_sampler_);
@@ -645,9 +660,22 @@ void Application::OnUpdate() {
 
         // Update the camera buffer with new position/orientation
         CameraObject camera_object{};
-        camera_object.screen_to_camera = glm::inverse(glm::perspective(
-            glm::radians(FOVY), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
-        camera_object.camera_to_world = glm::inverse(glm::lookAt(camera_pos_, camera_pos_ + camera_front_, camera_up_));
+        glm::mat4 projection = glm::perspective(
+            glm::radians(FOVY),
+            (float)window_->GetWidth() / (float)window_->GetHeight(),
+            0.1f,
+            100.0f
+        );
+
+        glm::mat4 view = glm::lookAt(
+            camera_pos_,
+            camera_pos_ + camera_front_,
+            camera_up_
+        );
+
+        camera_object.screen_to_camera = glm::inverse(projection);
+        camera_object.camera_to_world  = glm::inverse(view);
+        camera_object.view_proj        = projection * view;
         const float focal_length_m = 0.025f;
         const float f_stop = 2.1f;
 
@@ -1025,6 +1053,8 @@ void Application::OnRender() {
     }
 
     command_context->CmdBindResources(20, {scene_->GetEnvironmentMap()}, grassland::graphics::BIND_POINT_RAYTRACING);
+
+    command_context->CmdBindResources(21, {film_->GetVelocityImage()}, grassland::graphics::BIND_POINT_RAYTRACING);
 
     command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
 

@@ -7,6 +7,7 @@
 struct CameraObject {
     glm::mat4 screen_to_camera;
     glm::mat4 camera_to_world;
+    glm::mat4 view_proj;
     float focal_distance;
     float aperture_radius;
     float padding[2];
