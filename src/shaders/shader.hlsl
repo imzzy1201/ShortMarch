@@ -249,15 +249,15 @@ float2 sample_disk(inout uint seed, float radius)
 
     // Volumetric medium state carried along the path.
     // Default: start in vacuum/outside any medium.
-    //bool current_is_inside = true;
-    //float3 current_sigma_a = float3(0.05f, 0.05f, 0.06f);
-    //float3 current_sigma_s =  float3(0.2f, 0.2f, 0.2f);
-    //float current_vol_g = 0.1f;
+    bool current_is_inside = true;
+    float3 current_sigma_a = float3(0.05f, 0.05f, 0.05f);
+    float3 current_sigma_s =  float3(0.2f, 0.2f, 0.2f);
+    float current_vol_g = 0.1f;
     
-    bool current_is_inside = false;
-    float3 current_sigma_a = float3(0.0f, 0.0f, 0.0f);
-    float3 current_sigma_s =  float3(0.0f, 0.0f, 0.0f);
-    float current_vol_g = 0.0f;
+    //bool current_is_inside = false;
+    //float3 current_sigma_a = float3(0.0f, 0.0f, 0.0f);
+    //float3 current_sigma_s =  float3(0.0f, 0.0f, 0.0f);
+    //float current_vol_g = 0.0f;
 
     for (int depth = 0; depth < MAX_DEPTH; depth++) {
         payload.color = float3(0, 0, 0);
@@ -455,7 +455,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
     if (NdotV <= 0.0) return float3(0, 0, 0);
 
     if (NdotL < 0.0) {
-        return float3(1,1,1);
+        //return float3(1,1,1);
         // Transmission
         if (transmission <= 0.0) return float3(0, 0, 0);
         

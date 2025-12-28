@@ -234,9 +234,9 @@ void Application::OnInit() {
     // Add point lights
     PointLight point_light;
     point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    point_light.power = 20.0f;
+    point_light.power = 15.0f;
     point_light.radius = 0.08f;
-    // point_light.power = 0.0f;
+    //point_light.power = 0.0f;
     point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
     scene_->AddPointLight(point_light); // coridor_ceiling_light
 
@@ -244,7 +244,7 @@ void Application::OnInit() {
     point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
     point_light.power = 1.0f;
     point_light.radius = 0.08f;
-    // point_light.power = 0.0f;
+    point_light.power = 0.0f;
     point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
     scene_->AddPointLight(point_light); // lamp0_light
     point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -2.7301f, 2.67885f) + lamp_light_delta);
@@ -265,7 +265,7 @@ void Application::OnInit() {
     area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
     area_light.power = 7.85f;
     //area_light.power = 10.0f;
-    //area_light.power = 0.0f;
+    area_light.power = 0.0f;
     area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
     area_light.u = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
     area_light.v = blenderCoordsToGLM(glm::vec3(2.43f, 0.0f, 0.0f));
@@ -279,7 +279,7 @@ void Application::OnInit() {
     //glm::vec3 rotated_dx = rotation * exterior_fillLight_dx;
     //glm::vec3 rotated_dy = rotation * exterior_fillLight_dy;
     area_light.power = 1963.5f;
-    //area_light.power = 0.0f;
+    area_light.power = 0.0f;
     area_light.position =
         blenderCoordsToGLM(exterior_fillLight_center - 0.5f * exterior_fillLight_dx - 0.5f * exterior_fillLight_dy);
     area_light.color = glm::vec3(1.0f, 0.965f, 0.912f);
@@ -299,7 +299,7 @@ void Application::OnInit() {
     area_light.v = windows_light_dy;
     area_light.u = windows_light_dz;
     area_light.power = 200.0 * windows_light_dy.length() * windows_light_dz.length();
-    //area_light.power = 0.0f;
+    area_light.power = 0.0f;
     scene_->AddAreaLight(area_light); // windows dayLight_portal
 
     // Add sun light
@@ -392,9 +392,9 @@ void Application::OnInit() {
         fog_mat.dissolve = 0.0f;
         fog_mat.ior = 1.0f;
 
-        fog_mat.vol_sigma_a = glm::vec3(0.01f, 0.01f, 0.01f);
-        fog_mat.vol_sigma_s = glm::vec3(0.15f, 0.15f, 0.15f);
-        fog_mat.vol_g = 0.7f;
+        fog_mat.vol_sigma_a = glm::vec3(0.05f, 0.05f, 0.05f);
+        fog_mat.vol_sigma_s = glm::vec3(0.2f, 0.2f, 0.2f);
+        fog_mat.vol_g = 0.1f;
 
         glm::mat4 fog_transform = glm::translate(glm::mat4(1.0f), blenderCoordsToGLM(glm::vec3{2.54541f, -4.34681f, 1.09485f}));
         fog_transform = glm::scale(fog_transform, glm::vec3(5.0f, 5.0f, 10.0f));
@@ -460,13 +460,13 @@ void Application::OnInit() {
     // camera_pos_ = glm::vec3{0.0f, 1.0f, 5.0f};
     // camera_up_ = glm::vec3{0.0f, 1.0f, 0.0f}; // World up
     // camera_speed_ = 0.01f;
-    camera_pos_ = blenderCoordsToGLM(glm::vec3{2.5764f, -4.4658f, 1.0945f});
+    camera_pos_ = blenderCoordsToGLM(glm::vec3{1.0764f, -4.4658f, 1.0945f});
     camera_up_ = blenderCoordsToGLM(glm::vec3{0.00283f, -0.01084f, 0.99994}); // World up
     camera_speed_ = 0.01f;
 
     // Initialize new mouse/view variables
     // yaw_ = -90.0f; // Point down -Z
-    yaw_ = -90.0f - 14.6f; // Point down -Z
+    yaw_ = -90.0f + 14.6f; // Point down -Z
     pitch_ = 0.0f;
     last_x_ = (float)window_->GetWidth() / 2.0f;
     last_y_ = (float)window_->GetHeight() / 2.0f;
