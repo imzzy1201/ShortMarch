@@ -148,7 +148,7 @@ static const int MAX_DEPTH = 8;
 static const float DIRECT_CLAMP = 11.0;
 static const float INDIRECT_CLAMP = 6.0;
 static const float ISO_MULTIPLIER = 1.6;
-//static const float ISO_MULTIPLIER = 1.0;
+static const float BRIGHTNESS = -0.0;
 static const float GAMMA = 1.0 / 2.0;
 
 float3 clamp_direct(float3 color) {
@@ -241,10 +241,15 @@ float2 sample_disk(inout uint seed, float radius)
 
     // Volumetric medium state carried along the path.
     // Default: start in vacuum/outside any medium.
+    //bool current_is_inside = true;
+    //float3 current_sigma_a = float3(0.05f, 0.05f, 0.06f);
+    //float3 current_sigma_s =  float3(0.2f, 0.2f, 0.2f);
+    //float current_vol_g = 0.1f;
+    
     bool current_is_inside = false;
-    float3 current_sigma_a = float3(0.0, 0.0, 0.0);
-    float3 current_sigma_s = float3(0.0, 0.0, 0.0);
-    float current_vol_g = 0.0;
+    float3 current_sigma_a = float3(0.0f, 0.0f, 0.0f);
+    float3 current_sigma_s =  float3(0.0f, 0.0f, 0.0f);
+    float current_vol_g = 0.0f;
 
     for (int depth = 0; depth < MAX_DEPTH; depth++) {
         payload.color = float3(0, 0, 0);
@@ -306,6 +311,7 @@ float2 sample_disk(inout uint seed, float radius)
 
     radiance = pow(radiance, GAMMA);
     radiance = radiance * ISO_MULTIPLIER;
+    radiance = radiance + BRIGHTNESS;
 
 	// Write to immediate output (for camera movement mode)
 	output[pixel_coords] = float4(radiance, 1);
