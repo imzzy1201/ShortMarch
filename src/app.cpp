@@ -213,150 +213,173 @@ void Application::OnInit() {
     mouse_y_ = 0.0;
     // Don't grab cursor initially - user can right-click to enable camera mode
 
-    // Create scene
-    scene_ = std::make_unique<Scene>(core_.get());
+    //// Create scene
+    //scene_ = std::make_unique<Scene>(core_.get());
 
-    {
-        auto ents = Entity::LoadEntitiesFromObjWithMaterials("meshes/classroom.obj");
-        for (auto &up : ents) {
-            if (!up)
-                continue;
-            // transfer ownership into a shared_ptr for Scene
-            std::shared_ptr<Entity> sp(up.release());
-            scene_->AddEntity(sp);
-        }
-    }
+    //{
+    //    auto ents = Entity::LoadEntitiesFromObjWithMaterials("meshes/classroom.obj");
+    //    for (auto &up : ents) {
+    //        if (!up)
+    //            continue;
+    //        // transfer ownership into a shared_ptr for Scene
+    //        std::shared_ptr<Entity> sp(up.release());
+    //        scene_->AddEntity(sp);
+    //    }
+    //}
 
-    scene_->LoadEnvironmentMap("meshes/studio_garden_4k.hdr");
+    //scene_->LoadEnvironmentMap("meshes/sunny_rose_garden_4k.hdr");
 
-    float PI = 3.14159265359f;
+    //float PI = 3.14159265359f;
 
-    // Add point lights
-    PointLight point_light;
-    point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
-    point_light.power = 15.0f;
-    point_light.radius = 0.08f;
-    //point_light.power = 0.0f;
-    point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
-    scene_->AddPointLight(point_light); // coridor_ceiling_light
+    //// Add point lights
+    //PointLight point_light;
+    //point_light.position = blenderCoordsToGLM(glm::vec3(-3.7724f, 2.197f, 2.8151f));
+    //point_light.power = 15.0f;
+    //point_light.radius = 0.08f;
+    ////point_light.power = 0.0f;
+    //point_light.color = glm::vec3(1.0f, 0.949f, 0.884f);
+    //scene_->AddPointLight(point_light); // coridor_ceiling_light
 
-    glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
-    point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    point_light.power = 1.0f;
-    point_light.radius = 0.08f;
-    point_light.power = 0.0f;
-    point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
-    scene_->AddPointLight(point_light); // lamp0_light
-    point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -2.7301f, 2.67885f) + lamp_light_delta);
-    scene_->AddPointLight(point_light); // lamp1_light
-    point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -0.667536f, 2.67885f) + lamp_light_delta);
-    scene_->AddPointLight(point_light); // lamp2_light
-    point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -0.667536f, 2.67885f) + lamp_light_delta);
-    scene_->AddPointLight(point_light); // lamp3_light
-    point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, 1.41361f, 2.67885f) + lamp_light_delta);
-    scene_->AddPointLight(point_light); // lamp4_light
-    point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, 1.41361f, 2.67885f) + lamp_light_delta);
-    scene_->AddPointLight(point_light); // lamp5_light
+    //glm::vec3 lamp_light_delta = glm::vec3(0.0f, 0.0f, -0.36464f);
+    //point_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    //point_light.power = 1.0f;
+    //point_light.radius = 0.08f;
+    ////point_light.power = 0.0f;
+    //point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -2.7301f, 2.67885f) + lamp_light_delta);
+    //scene_->AddPointLight(point_light); // lamp0_light
+    //point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -2.7301f, 2.67885f) + lamp_light_delta);
+    //scene_->AddPointLight(point_light); // lamp1_light
+    //point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, -0.667536f, 2.67885f) + lamp_light_delta);
+    //scene_->AddPointLight(point_light); // lamp2_light
+    //point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, -0.667536f, 2.67885f) + lamp_light_delta);
+    //scene_->AddPointLight(point_light); // lamp3_light
+    //point_light.position = blenderCoordsToGLM(glm::vec3(1.99317f, 1.41361f, 2.67885f) + lamp_light_delta);
+    //scene_->AddPointLight(point_light); // lamp4_light
+    //point_light.position = blenderCoordsToGLM(glm::vec3(-0.597671f, 1.41361f, 2.67885f) + lamp_light_delta);
+    //scene_->AddPointLight(point_light); // lamp5_light
 
-    // Add area lights
-    AreaLight area_light;
-    glm::vec3 blackBoard_light_center = glm::vec3(0.897793f, 3.11939f, 1.9641f);
-    glm::vec3 blackBoard_light_size = glm::vec3(2.43f, 0.108f, 0.0f);
-    area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
-    area_light.power = 7.85f;
-    //area_light.power = 10.0f;
-    area_light.power = 0.0f;
-    area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    area_light.u = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
-    area_light.v = blenderCoordsToGLM(glm::vec3(2.43f, 0.0f, 0.0f));
-    scene_->AddAreaLight(area_light); // blackBoard_light
+    //// Add area lights
+    //AreaLight area_light;
+    //glm::vec3 blackBoard_light_center = glm::vec3(0.897793f, 3.11939f, 1.9641f);
+    //glm::vec3 blackBoard_light_size = glm::vec3(2.43f, 0.108f, 0.0f);
+    //area_light.position = blenderCoordsToGLM(blackBoard_light_center - 0.5f * blackBoard_light_size);
+    //area_light.power = 7.85f;
+    ////area_light.power = 10.0f;
+    ////area_light.power = 0.0f;
+    //area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    //area_light.u = blenderCoordsToGLM(glm::vec3(0.0f, 0.108f, 0.0f));
+    //area_light.v = blenderCoordsToGLM(glm::vec3(2.43f, 0.0f, 0.0f));
+    //scene_->AddAreaLight(area_light); // blackBoard_light
 
-    glm::vec3 exterior_fillLight_center = glm::vec3(4.04989f, -0.609926f, 2.59676f);
-    glm::vec3 exterior_fillLight_dx = glm::vec3(0.53f, 0.0f, -0.53f);
-    glm::vec3 exterior_fillLight_dy = glm::vec3(0.0f, 8.3f, 0.0f);
-    // rotate by quat w=0.398227, x=0, y=-0.917, z=0
-    //glm::quat rotation = glm::quat(glm::vec4(0.398227f, 0.0f, -0.917f, 0.0f));
-    //glm::vec3 rotated_dx = rotation * exterior_fillLight_dx;
-    //glm::vec3 rotated_dy = rotation * exterior_fillLight_dy;
-    area_light.power = 1963.5f;
-    area_light.power = 0.0f;
-    area_light.position =
-        blenderCoordsToGLM(exterior_fillLight_center - 0.5f * exterior_fillLight_dx - 0.5f * exterior_fillLight_dy);
-    area_light.color = glm::vec3(1.0f, 0.965f, 0.912f);
-    area_light.v = exterior_fillLight_dx;
-    area_light.u = exterior_fillLight_dy;
-    //area_light.u = blenderCoordsToGLM(rotated_dx);
-    //area_light.v = blenderCoordsToGLM(rotated_dy);
-    //grassland::LogInfo("rotated_dx: {}, {}, {}", rotated_dx.x, rotated_dx.y, rotated_dx.z);
-    //grassland::LogInfo("rotated_dy: {}, {}, {}", rotated_dy.x, rotated_dy.y, rotated_dy.z);
-    scene_->AddAreaLight(area_light); // exterior_fillLight
+    //glm::vec3 exterior_fillLight_center = glm::vec3(4.04989f, -0.609926f, 2.59676f);
+    //glm::vec3 exterior_fillLight_dx = glm::vec3(0.53f, 0.0f, -0.53f);
+    //glm::vec3 exterior_fillLight_dy = glm::vec3(0.0f, 8.3f, 0.0f);
+    //// rotate by quat w=0.398227, x=0, y=-0.917, z=0
+    ////glm::quat rotation = glm::quat(glm::vec4(0.398227f, 0.0f, -0.917f, 0.0f));
+    ////glm::vec3 rotated_dx = rotation * exterior_fillLight_dx;
+    ////glm::vec3 rotated_dy = rotation * exterior_fillLight_dy;
+    //area_light.power = 1963.5f;
+    ////area_light.power = 0.0f;
+    //area_light.position =
+    //    blenderCoordsToGLM(exterior_fillLight_center - 0.5f * exterior_fillLight_dx - 0.5f * exterior_fillLight_dy);
+    //area_light.color = glm::vec3(1.0f, 0.965f, 0.912f);
+    //area_light.v = exterior_fillLight_dx;
+    //area_light.u = exterior_fillLight_dy;
+    ////area_light.u = blenderCoordsToGLM(rotated_dx);
+    ////area_light.v = blenderCoordsToGLM(rotated_dy);
+    ////grassland::LogInfo("rotated_dx: {}, {}, {}", rotated_dx.x, rotated_dx.y, rotated_dx.z);
+    ////grassland::LogInfo("rotated_dy: {}, {}, {}", rotated_dy.x, rotated_dy.y, rotated_dy.z);
+    //scene_->AddAreaLight(area_light); // exterior_fillLight
 
-    glm::vec3 windows_light_position = glm::vec3(3.784359, 0.932677, -3.497636);
-    glm::vec3 windows_light_dy = glm::vec3(0, 2.706061 - 0.932677, 0);
-    glm::vec3 windows_light_dz = glm::vec3(0, 0, 4.395454 - (-3.497636));
-    area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    area_light.position = windows_light_position;
-    area_light.v = windows_light_dy;
-    area_light.u = windows_light_dz;
-    area_light.power = 200.0 * windows_light_dy.length() * windows_light_dz.length();
-    area_light.power = 0.0f;
-    scene_->AddAreaLight(area_light); // windows dayLight_portal
+    //glm::vec3 windows_light_position = glm::vec3(3.784359, 0.932677, -3.497636);
+    //glm::vec3 windows_light_dy = glm::vec3(0, 2.706061 - 0.932677, 0);
+    //glm::vec3 windows_light_dz = glm::vec3(0, 0, 4.395454 - (-3.497636));
+    //area_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    //area_light.position = windows_light_position;
+    //area_light.v = windows_light_dy;
+    //area_light.u = windows_light_dz;
+    //area_light.power = 200.0 * windows_light_dy.length() * windows_light_dz.length();
+    ////area_light.power = 0.0f;
+    //scene_->AddAreaLight(area_light); // windows dayLight_portal
 
-    // Add sun light
-    SunLight sun_light;
-    sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
-    // sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
-    sun_light.power = 5.0f;
-    //sun_light.power = 0.0f;
-    sun_light.angle = 1.71874f;
-    sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
-    scene_->AddSunLight(sun_light); // sun_light
+    //// Add sun light
+    //SunLight sun_light;
+    //sun_light.direction = glm::normalize(blenderCoordsToGLM(glm::vec3(-0.8739f, 0.0835f, -0.4791f)));
+    //// sun_light.direction = glm::normalize(glm::vec3(-0.5f, 0, 0));
+    //sun_light.power = 5.0f;
+    ////sun_light.power = 0.0f;
+    //sun_light.angle = 1.71874f;
+    //sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
+    //scene_->AddSunLight(sun_light); // sun_light
 
     // DEBUG SCENE:test clearcoat
 
-    // scene_ = std::make_unique<Scene>(core_.get());
+     scene_ = std::make_unique<Scene>(core_.get());
+     scene_->LoadEnvironmentMap("meshes/sunny_rose_garden_4k.hdr");
 
 
-    // PointLight test_light;
-    // test_light.position = glm::vec3(2.0f, 5.0f, 2.0f);
-    // test_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    // test_light.power = 50.0f; 
-    // test_light.radius = 0.05f;
-    // scene_->AddPointLight(test_light);
+     PointLight test_light;
+     test_light.position = glm::vec3(2.0f, 5.0f, 2.0f);
+     test_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+     test_light.power = 50.0f; 
+     test_light.radius = 0.05f;
+     scene_->AddPointLight(test_light);
 
-    // {
-    //     auto ground_mat = Material();
-    //     ground_mat.diffuse = glm::vec3(0.2f, 0.2f, 0.2f);
-    //     ground_mat.roughness = 0.8f; 
-    //     ground_mat.metallic = 0.0f;
-    //     ground_mat.dissolve = 1.0f;
+     {
+         auto ground_mat = Material();
+         ground_mat.diffuse = glm::vec3(0.2f, 0.2f, 0.2f);
+         ground_mat.roughness = 0.8f; 
+         ground_mat.metallic = 0.0f;
+         ground_mat.dissolve = 1.0f;
         
-    //     ground_mat.clearcoat_thickness = 1.0f;
-    //     //ground_mat.clearcoat_roughness = 0.02f;
-    //     ground_mat.clearcoat_roughness = 1.0f;
+         ground_mat.clearcoat_thickness = 1.0f;
+         //ground_mat.clearcoat_roughness = 0.02f;
+         ground_mat.clearcoat_roughness = 1.0f;
         
-    //     glm::mat4 ground_transform = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.5f, 0.0f)), glm::vec3(10.0f, 0.1f, 10.0f));
-    //     auto ground = std::make_shared<Entity>("meshes/cube.obj", ground_mat, ground_transform);
-    //     scene_->AddEntity(ground);
-    // }
+         glm::mat4 ground_transform = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.5f, 0.0f)), glm::vec3(10.0f, 0.1f, 10.0f));
+         auto ground = std::make_shared<Entity>("meshes/cube.obj", ground_mat, ground_transform);
+         scene_->AddEntity(ground);
+     }
 
-    // {
-    //     auto sphere_mat = Material();
-    //     sphere_mat.diffuse = glm::vec3(0.7f, 0.1f, 0.1f);
-    //     sphere_mat.roughness = 0.5f;
-    //     sphere_mat.metallic = 0.0f;
-    //     sphere_mat.dissolve = 1.0f;
+     {
+         auto sphere_mat = Material();
+         sphere_mat.diffuse = glm::vec3(0.1f, 0.1f, 0.1f);
+         sphere_mat.roughness = 0.5f;
+         sphere_mat.metallic = 0.0f;
+         sphere_mat.dissolve = 1.0f;
         
-    //     sphere_mat.clearcoat_thickness = 1.0f;
-    //     sphere_mat.clearcoat_roughness = 0.005f;
+         //sphere_mat.clearcoat_thickness = 1.0f;
+         //sphere_mat.clearcoat_roughness = 0.05f;
         
-    //     glm::mat4 sphere_transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
-    //     sphere_transform = glm::scale(sphere_transform, glm::vec3(1.0f));
+         glm::mat4 sphere_transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
+         sphere_transform = glm::scale(sphere_transform, glm::vec3(0.006f));
         
-    //     auto octa = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform);
-    //     octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
-    //     scene_->AddEntity(octa);
-    // }
+         auto octa = std::make_shared<Entity>("meshes/matball.obj", sphere_mat, sphere_transform);
+         //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
+         scene_->AddEntity(octa);
+
+         sphere_mat.clearcoat_thickness = 1.0f;
+         sphere_mat.clearcoat_roughness = 0.05f;
+
+         glm::mat4 sphere_transform_2 = glm::translate(glm::mat4(1.0f), glm::vec3(1.5f, 0.5f, -1.0f));
+         sphere_transform_2 = glm::scale(sphere_transform_2, glm::vec3(0.006f));
+
+         auto octa2 = std::make_shared<Entity>("meshes/matball.obj", sphere_mat, sphere_transform_2);
+         //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
+         scene_->AddEntity(octa2);
+
+         sphere_mat.roughness = 0.1f;
+         sphere_mat.metallic = 0.51f;
+         sphere_mat.clearcoat_thickness = 0.0f;
+         sphere_mat.clearcoat_roughness = 0.0f;
+
+         glm::mat4 sphere_transform_3 = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, -2.0f));
+         sphere_transform_3 = glm::scale(sphere_transform_3, glm::vec3(0.006f));
+
+         auto octa3 = std::make_shared<Entity>("meshes/matball.obj", sphere_mat, sphere_transform_3);
+         //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
+         scene_->AddEntity(octa3);
+     }
 
     // DEBUG SCENE END
 
@@ -386,14 +409,14 @@ void Application::OnInit() {
     //     scene_->AddEntity(red_sphere);
     // }
 
-    {
+    /*{
         auto fog_mat = Material();
         fog_mat.diffuse = glm::vec3(1.0f);
         fog_mat.dissolve = 0.0f;
         fog_mat.ior = 1.0f;
 
         fog_mat.vol_sigma_a = glm::vec3(0.05f, 0.05f, 0.05f);
-        fog_mat.vol_sigma_s = glm::vec3(0.2f, 0.2f, 0.2f);
+        fog_mat.vol_sigma_s = glm::vec3(0.15f, 0.15f, 0.15f);
         fog_mat.vol_g = 0.1f;
 
         glm::mat4 fog_transform = glm::translate(glm::mat4(1.0f), blenderCoordsToGLM(glm::vec3{2.54541f, -4.34681f, 1.09485f}));
@@ -401,7 +424,7 @@ void Application::OnInit() {
 
         auto fog_volume = std::make_shared<Entity>("meshes/cube.obj", fog_mat, fog_transform);
         scene_->AddEntity(fog_volume);
-    }
+    }*/
 
     // // Green metallic sphere
     // {
@@ -460,14 +483,18 @@ void Application::OnInit() {
     // camera_pos_ = glm::vec3{0.0f, 1.0f, 5.0f};
     // camera_up_ = glm::vec3{0.0f, 1.0f, 0.0f}; // World up
     // camera_speed_ = 0.01f;
-    camera_pos_ = blenderCoordsToGLM(glm::vec3{1.0764f, -4.4658f, 1.0945f});
-    camera_up_ = blenderCoordsToGLM(glm::vec3{0.00283f, -0.01084f, 0.99994}); // World up
+    camera_pos_ = blenderCoordsToGLM(glm::vec3{ 2.5764f, -4.4658f, 1.0945f });
+    //camera_pos_ = glm::vec3{1.55f, 1.67f, 4.44f};
+    camera_up_ = blenderCoordsToGLM(glm::vec3{ 0.00283f, -0.01084f, 0.99994 }); // World up
+    //camera_up_ = glm::vec3{0.04f, -0.019f,-0.98}; // World up
     camera_speed_ = 0.01f;
 
     // Initialize new mouse/view variables
     // yaw_ = -90.0f; // Point down -Z
-    yaw_ = -90.0f + 14.6f; // Point down -Z
+    yaw_ = -90.0f - 14.6f; // Point down -Z
+    //yaw_ = -87.5;
     pitch_ = 0.0f;
+    //pitch_ = -11.2f;
     last_x_ = (float)window_->GetWidth() / 2.0f;
     last_y_ = (float)window_->GetHeight() / 2.0f;
     mouse_sensitivity_ = 0.1f;

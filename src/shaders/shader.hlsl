@@ -152,8 +152,8 @@ static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 8;
 static const float DIRECT_CLAMP = 11.0;
 static const float INDIRECT_CLAMP = 6.0;
-static const float ISO_MULTIPLIER = 1.5;
-static const float BRIGHTNESS = 0.05;
+static const float ISO_MULTIPLIER = 1.0;
+static const float BRIGHTNESS = 0.00;
 static const float GAMMA = 1.0 / 2.0;
 
 float3 clamp_direct(float3 color) {
