@@ -391,19 +391,19 @@ float DistributionGGX(float3 N, float3 H, float roughness) {
     return num / (PI * denom * denom);
 }
 
-float GeometrySchlickGGX(float NdotV, float roughness) {
+float GeometrySmithGGX1(float NdotV, float roughness) {
     float a = roughness * roughness;
-    float k = a / 2.0;
-    float num = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
+    float a2 = a * a;
+    float num = 2.0 * NdotV;
+    float denom = NdotV + sqrt(a2 + (1.0 - a2) * NdotV * NdotV);
     return num / denom;
 }
 
 float GeometrySmith(float3 N, float3 V, float3 L, float roughness) {
     float NdotV = abs(dot(N, V));
     float NdotL = abs(dot(N, L));
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    float ggx2 = GeometrySmithGGX1(NdotV, roughness);
+    float ggx1 = GeometrySmithGGX1(NdotL, roughness);
     return ggx1 * ggx2;
 }
 
@@ -510,12 +510,13 @@ float3 EvalClearcoatBSDF(float3 N, float3 V, float3 L, float roughness, float cl
     float d = (NdotH * NdotH * (alpha2 - 1.0) + 1.0);
     float D = alpha2 / (PI * d * d);
 
-    float G = 1.0 / (4.0 * max(NdotL, 0.01) * max(NdotV, 0.01));
+    float G = GeometrySmith(N, V, L, roughness);
+    float denom = 4.0 * max(NdotL, 0.01) * max(NdotV, 0.01);
 
     // Fresnel for clearcoat uses dielectric F0 ~= 0.04; scale by clearcoat_thickness to modulate strength
     float Fc = FresnelSchlick(VdotH, float3(0.04, 0.04, 0.04)).x * clearcoat_thickness;
 
-    return float3(Fc * D * G, Fc * D * G, Fc * D * G);
+    return float3(Fc * D * G / denom, Fc * D * G / denom, Fc * D * G / denom);
 }
 
 void SampleIndirect(
