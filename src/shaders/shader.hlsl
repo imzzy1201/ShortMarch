@@ -152,8 +152,8 @@ static const float PI = 3.14159265359;
 static const int MAX_DEPTH = 8;
 static const float DIRECT_CLAMP = 11.0;
 static const float INDIRECT_CLAMP = 6.0;
-static const float ISO_MULTIPLIER = 1.6;
-static const float BRIGHTNESS = -0.0;
+static const float ISO_MULTIPLIER = 1.5;
+static const float BRIGHTNESS = 0.05;
 static const float GAMMA = 1.0 / 2.0;
 
 float3 clamp_direct(float3 color) {
@@ -249,15 +249,15 @@ float2 sample_disk(inout uint seed, float radius)
 
     // Volumetric medium state carried along the path.
     // Default: start in vacuum/outside any medium.
-    bool current_is_inside = true;
-    float3 current_sigma_a = float3(0.05f, 0.05f, 0.05f);
-    float3 current_sigma_s =  float3(0.2f, 0.2f, 0.2f);
-    float current_vol_g = 0.1f;
+    //bool current_is_inside = true;
+    //float3 current_sigma_a = float3(0.05f, 0.05f, 0.05f);
+    //float3 current_sigma_s =  float3(0.15f, 0.15f, 0.15f);
+    //float current_vol_g = 0.1f;
     
-    //bool current_is_inside = false;
-    //float3 current_sigma_a = float3(0.0f, 0.0f, 0.0f);
-    //float3 current_sigma_s =  float3(0.0f, 0.0f, 0.0f);
-    //float current_vol_g = 0.0f;
+    bool current_is_inside = false;
+    float3 current_sigma_a = float3(0.0f, 0.0f, 0.0f);
+    float3 current_sigma_s =  float3(0.0f, 0.0f, 0.0f);
+    float current_vol_g = 0.0f;
 
     for (int depth = 0; depth < MAX_DEPTH; depth++) {
         payload.color = float3(0, 0, 0);
@@ -313,9 +313,9 @@ float2 sample_disk(inout uint seed, float radius)
 
     // Prevent NaN/Inf from corrupting the accumulation buffer
     if (any(isnan(radiance))) {
-        radiance = float3(1000, 0, 0);
+        radiance = float3(0, 0, 0);
     } else if(any(isinf(radiance))) {
-        radiance = float3(1000, 0, 0);
+        radiance = float3(0, 0, 0);
     }
 
     radiance = pow(radiance, GAMMA);
@@ -331,7 +331,7 @@ float2 sample_disk(inout uint seed, float radius)
 
     output[pixel_coords] = float4(radiance, 1);
     
-    if (sample_count == 0)
+    if (sample_count >= 0)
         entity_id_output[pixel_coords] = first_hit_instance_id;
 
     float4 prev_color = accumulated_color[pixel_coords];
