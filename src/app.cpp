@@ -1098,6 +1098,10 @@ void Application::OnRender() {
     // their position at time t (using per-entity velocity) and update TLAS so subsequent samples
     // contribute motion-blurred results. We only apply this once per run so accumulated image
     // contains both pre- and post-shift samples.
+    if(camera_enabled_) {
+        // If camera is enabled, reset motion blur step to avoid applying motion blur
+        motion_blur_step_ = 0;
+    }
     if (!camera_enabled_  && film_ && film_->GetSampleCount() / base_samples_before_motion_blur_ > motion_blur_step_) {
         std::random_device rd;
         std::mt19937 gen(rd());
