@@ -354,9 +354,9 @@ void Application::OnInit() {
          //sphere_mat.clearcoat_roughness = 0.05f;
         
          glm::mat4 sphere_transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
-         sphere_transform = glm::scale(sphere_transform, glm::vec3(1.0f));
+         sphere_transform = glm::scale(sphere_transform, glm::vec3(0.5f));
         
-         auto octa = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform);
+         auto octa = std::make_shared<Entity>("meshes/cube.obj", sphere_mat, sphere_transform);
          //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
          scene_->AddEntity(octa);
 
@@ -365,9 +365,9 @@ void Application::OnInit() {
 
          sphere_mat.ior = 1.1f;
          glm::mat4 sphere_transform_2 = glm::translate(glm::mat4(1.0f), glm::vec3(1.5f, 0.5f, -1.0f));
-         sphere_transform_2 = glm::scale(sphere_transform_2, glm::vec3(1.0f));
+         sphere_transform_2 = glm::scale(sphere_transform_2, glm::vec3(0.5f));
 
-         auto octa2 = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform_2);
+         auto octa2 = std::make_shared<Entity>("meshes/cube.obj", sphere_mat, sphere_transform_2);
          //octa2->SetVelocity(glm::vec3(0.2f, 0.2f, 0.0f));
          scene_->AddEntity(octa2);
 
@@ -378,9 +378,9 @@ void Application::OnInit() {
 
          sphere_mat.ior = 1.2f;
          glm::mat4 sphere_transform_3 = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, -2.0f));
-         sphere_transform_3 = glm::scale(sphere_transform_3, glm::vec3(1.0f));
+         sphere_transform_3 = glm::scale(sphere_transform_3, glm::vec3(0.5f));
 
-         auto octa3 = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform_3);
+         auto octa3 = std::make_shared<Entity>("meshes/cube.obj", sphere_mat, sphere_transform_3);
          //octa3->SetVelocity(glm::vec3(0.4f, 0.4f, 0.0f));
          scene_->AddEntity(octa3);
      }
