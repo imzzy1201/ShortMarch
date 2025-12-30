@@ -467,7 +467,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         
         float common = (NDF * G * VdotH * LdotH) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
 
-        return albedo * (1.0 - F) * common * (1.0 - metallic) * transmission / (eta * eta);
+        return float3(1.0, 1.0, 1.0) * (1.0 - F) * common * (1.0 - metallic) * transmission / (eta * eta);
     } else {
         // Reflection
         float3 H = normalize(V + L);
