@@ -14,7 +14,6 @@ struct InstanceInfo {
     uint32_t texcoord_offset;
     uint32_t has_tangent;
     uint32_t tangent_offset;
-    glm::vec3 velocity;
     float _pad0;
 };
 

@@ -65,7 +65,6 @@ struct InstanceInfo {
     uint texcoord_offset;
     uint has_tangent;
     uint tangent_offset;
-    float3 velocity;
     float _pad0;
 };
 
@@ -122,7 +121,6 @@ StructuredBuffer<float3> tangents : register(t0, space17);
 Texture2D<float4> material_images[] : register(t0, space18);
 SamplerState material_sampler : register(s0, space19);
 Texture2D<float4> g_HDRISkybox : register(t0, space20);
-RWTexture2D<float2> velocity_output : register(u0, space21);
 
 // Random Number Generator
 uint tea(uint val0, uint val1) {
@@ -188,8 +186,6 @@ struct RayPayload {
     float3 current_sigma_a;
     float3 current_sigma_s;
     float current_vol_g;
-
-    float2 velocity;
 };
 
 float2 sample_disk(inout uint seed, float radius)
@@ -245,7 +241,6 @@ float2 sample_disk(inout uint seed, float radius)
     payload.seed = seed;
     
     int first_hit_instance_id = -1;
-    float2 first_hit_velocity = float2(0.0, 0.0);
 
     // Volumetric medium state carried along the path.
     // Default: start in vacuum/outside any medium.
@@ -281,7 +276,6 @@ float2 sample_disk(inout uint seed, float radius)
 
         if (depth == 0) {
             first_hit_instance_id = payload.hit ? (int)payload.instance_id : -1;
-            first_hit_velocity = payload.velocity;
         }
 
         if (!payload.hit) {
@@ -323,11 +317,6 @@ float2 sample_disk(inout uint seed, float radius)
     radiance = radiance + BRIGHTNESS;
 
 	// Write to immediate output (for camera movement mode)
-	
-    if(first_hit_instance_id != -1)
-        velocity_output[pixel_coords] = first_hit_velocity;
-    else    
-        velocity_output[pixel_coords] = float2(0.0, 0.0);    
 
     output[pixel_coords] = float4(radiance, 1);
     
@@ -1036,16 +1025,6 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
             return;
         }
     }
-    float3 move_vec = instance_infos[InstanceID()].velocity; 
-    float3 world_pos_curr = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
-    float3 world_pos_prev = world_pos_curr - move_vec;
-    float4 clip_curr = mul(camera_info.view_proj, float4(world_pos_curr, 1.0));
-    float4 clip_prev = mul(camera_info.view_proj, float4(world_pos_prev, 1.0));
-    float2 uv_curr = (clip_curr.xy / clip_curr.w) * 0.5 + 0.5;
-    float2 uv_prev = (clip_prev.xy / clip_prev.w) * 0.5 + 0.5;
-    uv_curr.y = 1.0 - uv_curr.y;
-    uv_prev.y = 1.0 - uv_prev.y;
-    payload.velocity = uv_curr - uv_prev;
 	payload.hit = true;
 	payload.instance_id = instance_id;
     

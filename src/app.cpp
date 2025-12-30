@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
+#include <random>
 
 static const float FOVY = 39.59f;
 
@@ -343,7 +344,7 @@ void Application::OnInit() {
 
      {
          auto sphere_mat = Material();
-         sphere_mat.diffuse = glm::vec3(0.1f, 0.1f, 0.1f);
+         sphere_mat.diffuse = glm::vec3(0.8f, 0.1f, 0.1f);
          sphere_mat.roughness = 0.5f;
          sphere_mat.metallic = 0.0f;
          sphere_mat.dissolve = 1.0f;
@@ -352,9 +353,9 @@ void Application::OnInit() {
          //sphere_mat.clearcoat_roughness = 0.05f;
         
          glm::mat4 sphere_transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
-         sphere_transform = glm::scale(sphere_transform, glm::vec3(0.006f));
+         sphere_transform = glm::scale(sphere_transform, glm::vec3(1.0f));
         
-         auto octa = std::make_shared<Entity>("meshes/matball.obj", sphere_mat, sphere_transform);
+         auto octa = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform);
          //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
          scene_->AddEntity(octa);
 
@@ -362,10 +363,10 @@ void Application::OnInit() {
          sphere_mat.clearcoat_roughness = 0.05f;
 
          glm::mat4 sphere_transform_2 = glm::translate(glm::mat4(1.0f), glm::vec3(1.5f, 0.5f, -1.0f));
-         sphere_transform_2 = glm::scale(sphere_transform_2, glm::vec3(0.006f));
+         sphere_transform_2 = glm::scale(sphere_transform_2, glm::vec3(1.0f));
 
-         auto octa2 = std::make_shared<Entity>("meshes/matball.obj", sphere_mat, sphere_transform_2);
-         //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
+         auto octa2 = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform_2);
+         octa2->SetVelocity(glm::vec3(0.2f, 0.2f, 0.0f));
          scene_->AddEntity(octa2);
 
          sphere_mat.roughness = 0.1f;
@@ -374,10 +375,10 @@ void Application::OnInit() {
          sphere_mat.clearcoat_roughness = 0.0f;
 
          glm::mat4 sphere_transform_3 = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, -2.0f));
-         sphere_transform_3 = glm::scale(sphere_transform_3, glm::vec3(0.006f));
+         sphere_transform_3 = glm::scale(sphere_transform_3, glm::vec3(1.0f));
 
-         auto octa3 = std::make_shared<Entity>("meshes/matball.obj", sphere_mat, sphere_transform_3);
-         //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
+         auto octa3 = std::make_shared<Entity>("meshes/octahedron.obj", sphere_mat, sphere_transform_3);
+         octa3->SetVelocity(glm::vec3(0.4f, 0.4f, 0.0f));
          scene_->AddEntity(octa3);
      }
 
@@ -467,6 +468,16 @@ void Application::OnInit() {
 
     // Build acceleration structures
     scene_->BuildAccelerationStructures();
+
+    // Store original transforms for motion blur use
+    original_entity_transforms_.clear();
+    for (const auto &ent : scene_->GetEntities()) {
+        if (ent) {
+            original_entity_transforms_.push_back(ent->GetTransform());
+        } else {
+            original_entity_transforms_.push_back(glm::mat4(1.0f));
+        }
+    }
 
     // Create film for accumulation
     film_ = std::make_unique<Film>(core_.get(), window_->GetWidth(), window_->GetHeight());
@@ -568,7 +579,6 @@ void Application::OnInit() {
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, image_descriptor_count); // space18
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_SAMPLER, 1); //space19
     program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, 1); // space20
-    program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1); // space21
     program_->Finalize();
 
     core_->CreateSampler(grassland::graphics::SamplerInfo(grassland::graphics::FILTER_MODE_LINEAR), &material_sampler_);
@@ -1081,7 +1091,34 @@ void Application::OnRender() {
 
     command_context->CmdBindResources(20, {scene_->GetEnvironmentMap()}, grassland::graphics::BIND_POINT_RAYTRACING);
 
-    command_context->CmdBindResources(21, {film_->GetVelocityImage()}, grassland::graphics::BIND_POINT_RAYTRACING);
+    // Motion blur: after a few initial samples, pick a random t in [0,1] and move all entities to
+    // their position at time t (using per-entity velocity) and update TLAS so subsequent samples
+    // contribute motion-blurred results. We only apply this once per run so accumulated image
+    // contains both pre- and post-shift samples.
+    if (!camera_enabled_  && film_ && film_->GetSampleCount() / base_samples_before_motion_blur_ > motion_blur_step_) {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+        motion_blur_t_ = dist(gen);
+
+        const auto &ents = scene_->GetEntities();
+        for (size_t i = 0; i < ents.size(); ++i) {
+            auto &ent = ents[i];
+            if (!ent)
+                continue;
+
+            glm::vec3 vel = ent->GetVelocity();
+            glm::mat4 orig = (i < original_entity_transforms_.size()) ? original_entity_transforms_[i] : ent->GetTransform();
+            // Translate in world-space by vel * t
+            glm::mat4 shifted = glm::translate(glm::mat4(1.0f), vel * motion_blur_t_) * orig;
+            ent->SetTransform(shifted);
+        }
+
+        // Update TLAS with new instance transforms
+        scene_->UpdateInstances();
+        grassland::LogInfo("Applied motion blur t={} to scene", motion_blur_t_);
+        motion_blur_step_++;
+    }
 
     command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
 

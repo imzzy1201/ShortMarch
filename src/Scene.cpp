@@ -327,8 +327,6 @@ void Scene::UpdateGlobalBuffers() {
         info.texcoord_offset = current_texcoord_offset;
         info.has_tangent = mesh.Tangents() ? 1 : 0;
         info.tangent_offset = current_tangent_offset;
-        info.velocity = entity->GetVelocity();
-        grassland::LogInfo("velocity:{} {} {}", info.velocity.x,info.velocity.y,info.velocity.z);
         instance_infos.push_back(info);
 
         // Append vertices (convert from Eigen::Vector3<float> to glm::vec3)

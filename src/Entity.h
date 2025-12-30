@@ -43,7 +43,7 @@ class Entity {
     grassland::Mesh<float> mesh_;
     Material material_;
     glm::mat4 transform_;
-
+    
     std::unique_ptr<grassland::graphics::Buffer> vertex_buffer_;
     std::unique_ptr<grassland::graphics::Buffer> index_buffer_;
     std::unique_ptr<grassland::graphics::AccelerationStructure> blas_;
