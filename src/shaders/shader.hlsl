@@ -473,7 +473,14 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         float3 H = normalize(V + L);
         float NDF = DistributionGGX(N, H, roughness);
         float G = GeometrySmith(N, V, L, roughness);
-        float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+        
+        float3 F;
+        if (metallic < 0.01 && transmission > 0.0) {
+             // Use exact Fresnel for dielectrics to match transmission
+             F = FresnelDielectric(max(dot(H, V), 0.0), eta);
+        } else {
+             F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+        }
         
         float3 numerator = NDF * G * F;
         float denominator = 4.0 * NdotV * NdotL + 0.0001;
@@ -1070,7 +1077,8 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
     float NoV = saturate(dot(N, V));
     float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
     
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+    float f0_dielectric = pow((1.0 - ior) / (1.0 + ior), 2.0);
+    float3 F0 = lerp(float3(f0_dielectric, f0_dielectric, f0_dielectric), albedo, metallic);
 
     // IOR handling
     float eta = front_face ? (1.0 / ior) : ior;
