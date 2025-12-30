@@ -36,8 +36,8 @@ struct Material {
     float roughness;    
     float metallic;  
     float sheen;                // [NOT USED]
-    float clearcoat_thickness;  // [NOT USED]
-    float clearcoat_roughness;  // [NOT USED]
+    float clearcoat_thickness;
+    float clearcoat_roughness;
     float anisotropy;           // [NOT USED]
     float anisotropy_rotation;  // [NOT USED]
 
@@ -448,7 +448,7 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         // Transmission
         if (transmission <= 0.0) return float3(0, 0, 0);
         
-        float3 h_vec = L * eta + V;
+        float3 h_vec = L + V * eta;
         if (length(h_vec) < 1e-6) return float3(0, 0, 0);
 
         float3 H = -normalize(h_vec);
@@ -463,9 +463,9 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         float3 F = FresnelDielectric(VdotH, eta);
         if (F.x >= 1.0) return float3(0, 0, 0); // TIR or grazing angle, no transmission
         
-        float sqrtDenom = (eta * LdotH - VdotH);
+        float sqrtDenom = (eta * VdotH - LdotH);
         
-        float common = (NDF * G * VdotH * LdotH * (eta * eta)) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
+        float common = (NDF * G * VdotH * LdotH) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
 
         return albedo * (1.0 - F) * common * (1.0 - metallic) * transmission;
     } else {
@@ -621,7 +621,7 @@ void SampleIndirect(
                 L_indirect = refract(-V, H, eta);
 
                 if (length(L_indirect) > 0.0) {
-                    float3 h_vec = L_indirect * eta + V;
+                    float3 h_vec = L_indirect + V * eta;
                     if (length(h_vec) < 1e-6) {
                         throughput_weight = float3(0, 0, 0);
                     } else {
@@ -634,7 +634,7 @@ void SampleIndirect(
 
                         float NDF = DistributionGGX(N, H_indirect, roughness);
 
-                        float sqrtDenom = (eta * LdotH - VdotH);
+                        float sqrtDenom = (eta * VdotH - LdotH);
                         float pdf_trans = NDF * NdotH * LdotH / max(sqrtDenom * sqrtDenom, 1e-5);
 
                         float pdf = ((1.0 - w_cc) * (w_spec_trans_base / w_base_sum)) / w_sum * pdf_trans;
