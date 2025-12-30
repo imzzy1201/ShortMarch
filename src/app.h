@@ -97,7 +97,7 @@ class Application {
     int selected_entity_id_; // -1 if no entity selected
   // Motion blur controls
   std::vector<glm::mat4> original_entity_transforms_; // stored original transforms for motion-blur sampling
-  int base_samples_before_motion_blur_ = 1; // render this many samples before applying motion blur
+  int base_samples_before_motion_blur_ = 100000; // render this many samples before applying motion blur
   int motion_blur_step_ = 0; // current motion blur step
   float motion_blur_t_ = 0.0f; // chosen random t in [0,1]
 };
