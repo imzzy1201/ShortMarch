@@ -437,15 +437,25 @@ float3 SampleCosineHemisphere(float2 u, float3 N) {
     return L;
 }
 
-float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float roughness, float metallic, float3 F0, float transmission, float eta) {
+float DistributionCharlie(float NdotH, float roughness) {
+    float r = max(roughness, 0.000001);
+    float invR = 1.0 / r;
+    float cos2h = NdotH * NdotH;
+    float sin2h = max(1.0 - cos2h, 0.0078125);
+    return (2.0 + invR) * pow(sin2h, invR * 0.5) / (2.0 * PI);
+}
+
+float VisibilityNeubelt(float NdotL, float NdotV) {
+    return 1.0 / (4.0 * (NdotL + NdotV - NdotL * NdotV));
+}
+
+float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float roughness, float metallic, float3 F0, float transmission, float eta, float sheen) {
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
     
     if (NdotV <= 0.0) return float3(0, 0, 0);
 
     if (NdotL < 0.0) {
-        //return float3(1,1,1);
-        // Transmission
         if (transmission <= 0.0) return float3(0, 0, 0);
         
         float3 h_vec = L + V * eta;
@@ -461,36 +471,50 @@ float3 EvalPrincipledBSDF(float3 N, float3 V, float3 L, float3 albedo, float rou
         float LdotH = max(dot(-L, H), 0.0);
         
         float3 F = FresnelDielectric(VdotH, eta);
-        if (F.x >= 1.0) return float3(0, 0, 0); // TIR or grazing angle, no transmission
+        if (F.x >= 1.0) return float3(0, 0, 0); 
         
         float sqrtDenom = (eta * VdotH - LdotH);
-        
         float common = (NDF * G * VdotH * LdotH) / (max(NdotV, 1e-5) * max(abs(NdotL), 1e-5) * max(sqrtDenom * sqrtDenom, 1e-5));
 
-        return float3(1.0, 1.0, 1.0) * (1.0 - F) * common * (1.0 - metallic) * transmission / (eta * eta);
-    } else {
-        // Reflection
+        return (1.0 - F) * common * (1.0 - metallic) * transmission / (eta * eta);
+    } 
+    
+    else {
         float3 H = normalize(V + L);
+        float NdotH = max(dot(N, H), 0.0);
+        float VdotH = max(dot(V, H), 0.0);
+
         float NDF = DistributionGGX(N, H, roughness);
         float G = GeometrySmith(N, V, L, roughness);
-        
+
         float3 F;
         if (metallic < 0.01 && transmission > 0.0) {
-             // Use exact Fresnel for dielectrics to match transmission
-             F = FresnelDielectric(max(dot(H, V), 0.0), eta);
+            F = FresnelDielectric(VdotH, eta);
         } else {
-             F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+            F = FresnelSchlick(VdotH, F0);
         }
-        
-        float3 numerator = NDF * G * F;
-        float denominator = 4.0 * NdotV * NdotL + 0.0001;
-        float3 specular = numerator / denominator;
-        
+
+        float3 specular = (NDF * G * F) / (4.0 * NdotV * NdotL + 1e-5);
+
+        float3 sheen_term = float3(0.0, 0.0, 0.0);
+        float sheen_scaling = 0.0;
+
+        if (sheen > 1e-6) {
+            float Ds = DistributionCharlie(NdotH, roughness);
+            float Vs = VisibilityNeubelt(NdotL, NdotV);
+            
+            float3 sheenColor = float3(1.0,1.0,1.0);
+            float rimBoost = 1.0;
+            sheen_term = sheen * sheenColor * Ds * Vs * rimBoost;
+            sheen_scaling = clamp(sheen * rimBoost, 0.0, 1.0);
+        }
+
         float3 kS = F;
-        float3 kD = (float3(1.0, 1.0, 1.0) - kS) * (1.0 - metallic);
+        float3 kD = (1.0 - kS) * (1.0 - metallic);
+
         float3 diffuse = kD * albedo * (1.0 - transmission) / PI;
-        
-        return diffuse + specular;
+
+        return (diffuse + specular + sheen_term) * NdotL;
     }
 }
 
@@ -530,6 +554,7 @@ void SampleIndirect(
     float3 F0,
     float transmission,
     float eta,
+    float sheen,
     float clearcoat_thickness,
     float clearcoat_roughness,
     out float3 L_indirect,
@@ -620,7 +645,7 @@ void SampleIndirect(
                     float NdotL_indirect = max(dot(N, L_indirect), 0.0);
                     
                     if (NdotL_indirect > 0.0) {
-                        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                        float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta, sheen);
                         
                         float HdotV = max(dot(H, V), 1e-6);
                         float NdotH = max(dot(N, H), 0.0);
@@ -674,7 +699,7 @@ void SampleIndirect(
                             float pdf = ((1.0 - w_cc) * p_spec) / w_sum * p_choice * pdf_trans;
                             
                             if (pdf > 1e-6) {
-                                float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                                float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta, sheen);
                                 throughput_weight = bsdf * abs(dot(N, L_indirect)) / pdf;
                             }
                             next_origin = world_pos + L_indirect * 0.001;
@@ -689,7 +714,7 @@ void SampleIndirect(
 
             float NdotL_indirect = max(dot(N, L_indirect), 0.0);
             if (NdotL_indirect > 0.0) {
-                float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta);
+                float3 bsdf = EvalPrincipledBSDF(N, V, L_indirect, albedo, roughness, metallic, F0, transmission, eta, sheen);
                 float pdf_diff = NdotL_indirect / PI;
                 float pdf = ((1.0 - w_cc) * p_diff) / w_sum * pdf_diff;
 
@@ -1070,6 +1095,7 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
     float roughness = max(mat.roughness, 0.001); 
     float metallic = mat.metallic;
     float3 emission = mat.emission;
+    float sheen = mat.sheen;
     float transmission = 1.0 - mat.dissolve;
     float ior = mat.ior;
     // if (ior < 1.0) ior = 1.5;
@@ -1115,7 +1141,7 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
             float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
             
             float NdotL = abs(dot(N, L));
-            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
+            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta, sheen);
             float3 total_bsdf = clearcoat_brdf + base_bsdf * (1.0 - Fc);
 
             Lo += shadow_hit * clamp_direct(total_bsdf * radiance * abs(NdotL));
@@ -1147,7 +1173,7 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
             float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
             
             float NdotL = abs(dot(N, L));
-            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
+            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta, sheen);
             float3 total_bsdf = clearcoat_brdf + base_bsdf * (1.0 - Fc);
 
             Lo += shadow_hit * clamp_direct(total_bsdf * radiance * abs(NdotL));
@@ -1183,7 +1209,7 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
             float Fc = FresnelSchlick(NoV, float3(0.04, 0.04, 0.04)).x * mat.clearcoat_thickness;
             
             float NdotL = abs(dot(N, L));
-            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta);
+            float3 base_bsdf = EvalPrincipledBSDF(N, V, L, albedo, roughness, metallic, F0, transmission, eta, sheen);
             float3 total_bsdf = clearcoat_brdf + base_bsdf * (1.0 - Fc);
 
             Lo += shadow_hit * clamp_direct(total_bsdf * radiance * abs(NdotL));
@@ -1197,7 +1223,7 @@ float HenyeyGreensteinPhase(float cosTheta, float g) {
     float3 throughput_weight;
     float3 next_origin;
 
-    SampleIndirect(payload.seed, N, V, world_pos, albedo, roughness, metallic, F0, transmission, eta, mat.clearcoat_thickness, mat.clearcoat_roughness, L_indirect, throughput_weight, next_origin);
+    SampleIndirect(payload.seed, N, V, world_pos, albedo, roughness, metallic, F0, transmission, eta, sheen, mat.clearcoat_thickness, mat.clearcoat_roughness, L_indirect, throughput_weight, next_origin);
     
     float cos_in = dot(-V, world_normal);
     float cos_out = dot(L_indirect, world_normal);

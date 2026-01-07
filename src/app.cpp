@@ -313,77 +313,54 @@ void Application::OnInit() {
     //sun_light.color = glm::vec3(1.0f, 1.0f, 0.9f);
     //scene_->AddSunLight(sun_light); // sun_light
 
-    // DEBUG SCENE:test clearcoat
+    // DEBUG SCENE: sheen test
 
-     scene_ = std::make_unique<Scene>(core_.get());
-     scene_->LoadEnvironmentMap("meshes/sunny_rose_garden_4k.hdr");
+    scene_ = std::make_unique<Scene>(core_.get());
+    //scene_->LoadEnvironmentMap("meshes/sunny_rose_garden_4k.hdr");
 
+    // Single point light to illuminate test objects
+    PointLight test_light;
+    test_light.position = glm::vec3(0.0f, 2.0f, 5.0f);
+    test_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    test_light.power = 150.0f;
+    test_light.radius = 0.08f;
+    scene_->AddPointLight(test_light);
 
-     PointLight test_light;
-     test_light.position = glm::vec3(2.0f, 5.0f, 2.0f);
-     test_light.color = glm::vec3(1.0f, 1.0f, 1.0f);
-     test_light.power = 50.0f; 
-     test_light.radius = 0.05f;
-     scene_->AddPointLight(test_light);
+    // Ground - neutral low-sheen surface
+    {
+        auto ground_mat = Material();
+        ground_mat.diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
+        ground_mat.roughness = 0.9f;
+        ground_mat.metallic = 0.0f;
+        ground_mat.dissolve = 1.0f;
+        ground_mat.clearcoat_thickness = 0.0f;
+        ground_mat.clearcoat_roughness = 0.0f;
+        ground_mat.sheen = 0.0f;
 
-     {
-         auto ground_mat = Material();
-         ground_mat.diffuse = glm::vec3(0.2f, 0.2f, 0.2f);
-         ground_mat.roughness = 0.8f; 
-         ground_mat.metallic = 0.0f;
-         ground_mat.dissolve = 1.0f;
+        glm::mat4 ground_transform = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.5f, 0.0f)), glm::vec3(12.0f, 0.1f, 6.0f));
+        auto ground = std::make_shared<Entity>("meshes/cube.obj", ground_mat, ground_transform);
+        scene_->AddEntity(ground);
+    }
+
+    const int kCount = 6;
+    for (int i = 0; i < kCount; ++i) {
+        auto mat = Material();
+        mat.diffuse = glm::vec3(0.02f, 0.05f, 0.2f); 
         
-         ground_mat.clearcoat_thickness = 1.0f;
-         //ground_mat.clearcoat_roughness = 0.02f;
-         ground_mat.clearcoat_roughness = 1.0f;
+        mat.roughness = 0.4f; 
+        mat.metallic = 0.0f;
+        mat.dissolve = 1.0f;
+        mat.ior = 1.45f;
         
-         glm::mat4 ground_transform = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.5f, 0.0f)), glm::vec3(10.0f, 0.1f, 10.0f));
-         auto ground = std::make_shared<Entity>("meshes/cube.obj", ground_mat, ground_transform);
-         scene_->AddEntity(ground);
-     }
+        mat.sheen = static_cast<float>(i) / static_cast<float>(kCount - 1);
 
-     {
-         auto sphere_mat = Material();
-         sphere_mat.diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-         sphere_mat.roughness = 0.05f;
-         sphere_mat.metallic = 0.0f;
-         sphere_mat.dissolve = 0.2f;
-         sphere_mat.ior = 1.0f;
-        
-         //sphere_mat.clearcoat_thickness = 1.0f;
-         //sphere_mat.clearcoat_roughness = 0.05f;
-        
-         glm::mat4 sphere_transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.5f, 0.0f));
-         sphere_transform = glm::scale(sphere_transform, glm::vec3(0.5f));
-        
-         auto octa = std::make_shared<Entity>("meshes/cube.obj", sphere_mat, sphere_transform);
-         //octa->SetVelocity(glm::vec3(0.5f, 0.5f, 0.0f));
-         scene_->AddEntity(octa);
+        float x = (static_cast<float>(i) - (kCount - 1) * 0.5f) * 1.2f*100;
+        glm::mat4 t = glm::translate(glm::mat4(0.01f), glm::vec3(x, 0.5f, -2.0f));
+        t = glm::scale(t, glm::vec3(0.5f));
 
-         //sphere_mat.clearcoat_thickness = 1.0f;
-         //sphere_mat.clearcoat_roughness = 0.05f;
-
-         sphere_mat.ior = 1.1f;
-         glm::mat4 sphere_transform_2 = glm::translate(glm::mat4(1.0f), glm::vec3(1.5f, 0.5f, -1.0f));
-         sphere_transform_2 = glm::scale(sphere_transform_2, glm::vec3(0.5f));
-
-         auto octa2 = std::make_shared<Entity>("meshes/cube.obj", sphere_mat, sphere_transform_2);
-         //octa2->SetVelocity(glm::vec3(0.2f, 0.2f, 0.0f));
-         scene_->AddEntity(octa2);
-
-         //sphere_mat.roughness = 0.1f;
-         //sphere_mat.metallic = 0.51f;
-         //sphere_mat.clearcoat_thickness = 0.0f;
-         //sphere_mat.clearcoat_roughness = 0.0f;
-
-         sphere_mat.ior = 1.2f;
-         glm::mat4 sphere_transform_3 = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, -2.0f));
-         sphere_transform_3 = glm::scale(sphere_transform_3, glm::vec3(0.5f));
-
-         auto octa3 = std::make_shared<Entity>("meshes/cube.obj", sphere_mat, sphere_transform_3);
-         //octa3->SetVelocity(glm::vec3(0.4f, 0.4f, 0.0f));
-         scene_->AddEntity(octa3);
-     }
+        auto sph = std::make_shared<Entity>("meshes/matball.obj", mat, t);
+        scene_->AddEntity(sph);
+    }
 
     // DEBUG SCENE END
 
