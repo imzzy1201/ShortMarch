@@ -19,11 +19,11 @@
   - [ ] Volumetric emission (1pt)
   - [x] Volumetric alpha shadow (2pts)
 - [ ] Special Visual Effects: Options include:
-  - [ ] Motion blur, depth of field (**basic**)
+  - [x] Motion blur, depth of field (**basic**)
   - [x] Alpha shadow (**basic**)
   - [ ] Cartoon style rendering (2pts)
   - [ ] Chromatic dispersion (2pts)
-- [ ] Lighting: Options include:
+- [x] Lighting: Options include:
   - [x] Point light and area light (**basic**)
   - [x] Environment lighting with HDR, such as skybox (2pts)
 - [x] Anti-aliasing: Implement an anti-aliasing algorithm (**basic**)
