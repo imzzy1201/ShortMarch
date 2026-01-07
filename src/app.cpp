@@ -345,7 +345,7 @@ void Application::OnInit() {
     const int kCount = 6;
     for (int i = 0; i < kCount; ++i) {
         auto mat = Material();
-        mat.diffuse = glm::vec3(0.02f, 0.05f, 0.2f); 
+        mat.diffuse = glm::vec3(0.02f, 0.02f, 0.02f); 
         
         mat.roughness = 0.4f; 
         mat.metallic = 0.0f;
@@ -354,11 +354,11 @@ void Application::OnInit() {
         
         mat.sheen = static_cast<float>(i) / static_cast<float>(kCount - 1);
 
-        float x = (static_cast<float>(i) - (kCount - 1) * 0.5f) * 1.2f*100;
-        glm::mat4 t = glm::translate(glm::mat4(0.01f), glm::vec3(x, 0.5f, -2.0f));
+        float x = (static_cast<float>(i) - (kCount - 1) * 0.5f) * 1.2f;
+        glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(x, 0.5f, -2.0f));
         t = glm::scale(t, glm::vec3(0.5f));
 
-        auto sph = std::make_shared<Entity>("meshes/matball.obj", mat, t);
+        auto sph = std::make_shared<Entity>("meshes/bunny.obj", mat, t);
         scene_->AddEntity(sph);
     }
 
