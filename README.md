@@ -1,5 +1,7 @@
 # ShortMarch
 
+![demo](./assets/demo.png)
+
 ## Description
 
 This is the repository for course project the Advanced Computer Graphics instructed by *Li Yi* at IIIS, Tsinghua University. 
@@ -20,7 +22,7 @@ Using this rendering system, we construct and render a variety of scenes that sh
 
 ## How to build
 
-_The following section is from Shortmarch's README.md_ 
+_The following section is from the original README.md of ShortMarch._ 
 
 We recommend using [Visual Studio](https://visualstudio.microsoft.com/) as the IDE for building this project.
 
@@ -251,5 +253,4 @@ Two non-collapsible panels appear in inspection mode:
    - Images saved with timestamp in filename
    - Console shows full path where image is saved
    - Saved images are clean (no UI, no highlights)
-
 
