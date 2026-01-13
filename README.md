@@ -2,19 +2,25 @@
 
 ## Description
 
-This is the official repository for the Advanced Computer Graphics instructed by *Li Yi* at IIIS, Tsinghua University. 
+This is the repository for course project the Advanced Computer Graphics instructed by *Li Yi* at IIIS, Tsinghua University. 
 
-This project contains a simple framework for GPU rendering downgraded from [LongMarch](https://github.com/LazyJazzDev/LongMarch/tree/main) by *Zijian Lyu*.
+The code is based on ShortMarch written by *He Li* (TA for 2025 Fall Semester), which contains a simple framework for GPU rendering downgraded from [LongMarch](https://github.com/LazyJazzDev/LongMarch/tree/main) by *Zijian Lyu*.
 
-The demo code is written by *He Li* (TA for 2025 Fall Semester), feel free to contact him if you have any questions.
+This project presents the design and implementation of a physically based hardware rendering system capable of producing realistic images of complex 3D scenes. The system aims to faithfully model light transport and material interactions while maintaining practical performance through carefully designed rendering techniques and optimizations.
 
-## Honor Code
+Our rendering system implements a range of physically based rendering features. In particular, we implement:
 
-You are expected to uphold the principles of academic integrity and honesty in all your work related to this repository. Any form of academic dishonesty, including but not limited to plagiarism, cheating, or unauthorized collaboration, is strictly prohibited and may result in severe consequences. **Any direct copy and paste of code (even from the `external/` code this repository referred) or using AI tools to generate code with knowledge of the subject matter will be considered as cheating**. You are free to read any reference materials, including books, articles, and online resources, to enhance your understanding of the subject matter.
+- A basic path tracing pipeline that simulates physically accurate light transport.
+- Principled BSDF material models to achieve realistic and consistent surface appearance.
+- Support for multiple types of light sources, including point lights, area lights, directional (sun) lights, and environment lighting.
+- Volumetric rendering for participating media, enabling effects such as fog, smoke, and particle-based phenomena.
+- Camera and temporal effects, including depth of field and motion blur, to enhance visual realism.
 
-By accessing and using this repository, you acknowledge that you have read, understood, and agreed to abide by this Honor Code. If you do not agree to these terms, you must refrain from using this repository.
+Using this rendering system, we construct and render a variety of scenes that showcase both the visual quality and flexibility of our implementation.
 
 ## How to build
+
+_The following section is from Shortmarch's README.md_ 
 
 We recommend using [Visual Studio](https://visualstudio.microsoft.com/) as the IDE for building this project.
 
@@ -77,13 +83,67 @@ where `/path/to/a/json` is a non-existent file, it indicates that the Vulkan val
 	- `HKEY_CURRENT_USER\SOFTWARE\Khronos\Vulkan\ExplicitLayers`.
 3. Delete the entry that points to the non-existent JSON file and restart your program.
 
-## Getting Started with the Ray Tracing Demo
+_The following section is the extra requirement to build our repo._
 
-The `src/` directory contains a minimalistic interactive ray tracing demo that showcases hardware-accelerated ray tracing using the LongMarch framework. This demo features a scene-based architecture with entity management, interactive camera controls, and an ImGui-based inspection interface.
+### Download the objects and materials files
 
-In your own project, you could either start from this demo or build from scratch. You could modify any file in the `src/` directory to fit your needs.
+Our repository uses objects provided in LongMarch's assets, but also uses some additional custom objects.
 
-### Project Structure
+You can download the objects from https://cloud.tsinghua.edu.cn/d/968e11c547684ae8b5a4/ ,and use them to replace the `external\LongMarch\assets\meshes` folder.
+
+After that, you can generate different scenes by modifying the code in `app.cpp`.
+## Implemented Features
+
+### Path Tracing Core
+
+- Progressive path tracing supporting diffuse and specular,transmissive transport
+
+- Create a custom scene with tidiness and attractiveness
+
+
+### Materials & BSDFs
+
+- Transmissive materials with refraction
+
+- Principled BSDF based on microfacet theory
+
+- Multi-layer materials, including clearcoat-style layering
+
+### Texture
+
+- Color texture mapping with material images
+
+### Importance Sampling
+- Importance sampling with Russian Roulette,mutiple importance sampling for BSDFs
+### Sampling & Anti-Aliasing
+Combined sampling strategies for variance reduction
+### Volumetric & Subsurface Effects
+
+- Homogeneous volume rendering with free-flight sampling
+
+- Subsurface scattering (channel-independent approximation)
+
+- Volumetric alpha shadows
+
+### Special Visual Effects
+
+- Motion blur, depth of field(by setting properties of entities and camera)
+
+- Alpha shadow
+### Lighting
+
+- Point lights and area lights with shadow testing
+
+- Environment lighting using HDR skyboxes
+
+- Additionally,sunlight with given angle
+
+### Anti-aliasing
+- Anti-aliasing via stochastic pixel jitter(already implemented in ShortMarch)
+
+_The following parts is from ShortMarch's README.md_.
+
+## Project Structure
 
 ```
 src/
@@ -96,13 +156,11 @@ src/
 └── shaders/
     └── shader.hlsl       # Ray tracing shaders (raygen, miss, closest hit)
 ```
-
-### Key Features
-
+## Key Features
 #### 1. Scene-Based Architecture
 - **Scene Management**: The `Scene` class manages multiple entities and builds the Top-Level Acceleration Structure (TLAS)
 - **Entity System**: Each `Entity` contains a mesh (loaded from `.obj` files), a material, and a transform matrix
-- **Materials**: Simple PBR materials with base color, roughness, and metallic properties
+- **Materials**: PBR materials with complex member variables and custom material images,satisfying the requirement of principled BSDF.
 
 #### 2. Interactive Camera Controls
 The demo supports two modes:
@@ -194,123 +252,3 @@ Two non-collapsible panels appear in inspection mode:
    - Console shows full path where image is saved
    - Saved images are clean (no UI, no highlights)
 
-### Code Architecture
-
-#### Application Class (`app.h/app.cpp`)
-The main application class manages:
-- Graphics core initialization (D3D12 or Vulkan)
-- Window creation and event handling
-- Camera state and controls
-- Scene rendering and entity interaction
-- ImGui interface rendering
-
-Key methods:
-- `OnInit()` - Initialize graphics, create scene, load entities
-- `OnUpdate()` - Process input, update hover detection, upload GPU buffers
-- `OnRender()` - Execute ray tracing, apply post-process highlighting, render ImGui overlays
-- `OnClose()` - Clean up resources
-- `UpdateHoveredEntity()` - GPU-based entity ID and pixel color readback for accurate picking
-- `ApplyHoverHighlight()` - Post-process highlighting applied after accumulation
-- `SaveAccumulatedOutput()` - Save clean accumulated render to PNG file
-
-#### Scene Class (`Scene.h/Scene.cpp`)
-Manages the scene graph:
-- `AddEntity()` - Add entities to the scene
-- `BuildAccelerationStructures()` - Build TLAS from all entity BLAS
-- `UpdateMaterialsBuffer()` - Upload materials to GPU
-- `GetTLAS()` - Get the acceleration structure for rendering
-
-#### Entity Class (`Entity.h/Entity.cpp`)
-Represents individual objects:
-- `LoadMesh()` - Load geometry from `.obj` files
-- `BuildBLAS()` - Create Bottom-Level Acceleration Structure
-- Material and transform properties
-
-#### Film Class (`Film.h/Film.cpp`)
-Manages progressive sample accumulation:
-- `Reset()` - Clear accumulated samples (called when camera stops moving)
-- `IncrementSampleCount()` - Track the number of accumulated samples
-- `DevelopToOutput()` - Average accumulated colors and output final image
-- `Resize()` - Handle window resize events
-- Internal buffers for accumulated color and sample counts
-
-#### Shader (`shaders/shader.hlsl`)
-HLSL ray tracing shaders:
-- `RayGenMain` - Generate primary rays from camera, accumulate samples to film buffers, write entity IDs
-- `MissMain` - Sky gradient for missed rays
-- `ClosestHitMain` - Shading with material properties (highlighting done in post-process)
-- Writes to multiple outputs: color, entity ID, and accumulation buffers
-
-### Adding New Entities
-
-To add new objects to the scene, edit `Application::OnInit()` in `app.cpp`:
-
-```cpp
-// Example: Add a new red sphere
-auto red_sphere = std::make_shared<Entity>(
-    "meshes/preview_sphere.obj",                    // Mesh path
-    Material(glm::vec3(1.0f, 0.0f, 0.0f), 0.3f, 0.0f),  // Red, smooth, non-metallic
-    glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 1.0f, 0.0f))  // Position
-);
-scene_->AddEntity(red_sphere);
-```
-
-After adding entities, remember to call `scene_->BuildAccelerationStructures()`.
-
-### Customizing Materials
-
-Materials use a simple PBR model:
-```cpp
-Material(
-    glm::vec3(r, g, b),  // Base color (0.0 to 1.0)
-    roughness,            // Surface roughness (0.0 = smooth, 1.0 = rough)
-    metallic              // Metallic factor (0.0 = dielectric, 1.0 = metal)
-);
-```
-
-### Technical Details
-
-- **Acceleration Structures**: Uses hardware ray tracing with BLAS per entity and a single TLAS
-- **Resource Bindings**:
-  - Space 0: Acceleration Structure (TLAS)
-  - Space 1: Output image (UAV) - immediate rendering output
-  - Space 2: Camera info (constant buffer)
-  - Space 3: Materials (structured buffer)
-  - Space 4: Hover info (constant buffer)
-  - Space 5: Entity ID output (UAV) - for pixel-perfect entity picking
-  - Space 6: Accumulated color (UAV) - progressive accumulation buffer
-  - Space 7: Accumulated samples (UAV) - sample count per pixel
-- **Dual Output Mode**: 
-  - Camera enabled: Shows immediate render output from space1
-  - Camera disabled: Shows accumulated/averaged output for progressive refinement
-- **Entity Picking**: Uses GPU-rendered ID buffer (space5) for pixel-perfect cursor-based entity selection
-- **Post-Process Highlighting**: Hover highlights applied after accumulation, ensuring clean saved screenshots
-
-### Keyboard Shortcuts
-
-| Key Combination | Action | Mode |
-|----------------|--------|------|
-| **Right Click** | Toggle camera mode on/off | Any |
-| **W/A/S/D** | Move camera forward/left/backward/right | Camera mode |
-| **Space** | Move camera up | Camera mode |
-| **Shift** | Move camera down | Camera mode |
-| **Mouse** | Look around | Camera mode |
-| **Left Click** | Select hovered entity | Inspection mode |
-| **Tab** (hold) | Hide UI panels | Inspection mode |
-| **Ctrl+S** | Save screenshot as PNG | Inspection mode |
-
-### Performance Considerations
-
-- **GPU Readback**: Entity ID and pixel color picking use synchronous GPU readback which may cause minor stalls
-- **CPU-side Film Development**: The `DevelopToOutput()` method currently runs on CPU; consider implementing a compute shader for better performance
-- **CPU-side Post-Highlighting**: The `ApplyHoverHighlight()` method downloads and uploads full images each frame when hovering
-- **Sample Accumulation**: Accumulation happens in the shader every frame; when camera is moving, these writes are unused overhead
-
-### Known Limitations
-
-- **Simple Lighting**: Placeholder normal (up vector) for diffuse shading
-- **No Anti-aliasing**: Single sample per pixel per frame (can be improved with jittered sampling)
-- **Static Scenes**: Animation requires manual `UpdateInstances()` calls
-- **Single Window**: ImGui context supports only one window at a time
-- **No Tone Mapping**: Accumulated colors are directly averaged without tone mapping or exposure control
-- **Performance Overhead**: Post-process highlighting and pixel inspector use full-image GPU readbacks
